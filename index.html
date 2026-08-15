@@ -70,18 +70,24 @@
     .cardType{font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
     .cardText{font-size:28px;font-weight:900;line-height:1.45;margin:18px 0}
     .deckButtons{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px}
+    .deckTab{border:2px solid transparent}
+    .deckTab.active{border-color:#222;box-shadow:inset 0 0 0 1px #222}
     .deckDaily{background:#e6f5e9;color:#235d31}
     .deckTalk{background:#fff0dd;color:#7a4611}
     .deckDescribe{background:#e7efff;color:#264f91}
+    .drawControls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
     .gameActions{display:flex;gap:10px;margin-top:12px}
     .gameActions>*{flex:1}
+    .ticketShelf{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+    .ticketCard{border:1px solid var(--line);border-radius:16px;padding:14px;background:#faf8f3}
+    .ticketValue{font-size:30px;font-weight:900;margin:6px 0}
     @media(max-width:520px){.players{grid-template-columns:1fr}.row{flex-direction:column}}
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>不讲中文交流会 🎴</h1>
-  <div class="sub">v0.4.0 · 双人实时抽卡游戏</div>
+  <div class="sub">v0.4.1 · 双人实时抽卡游戏</div>
 
   <div id="bootPanel" class="panel">
     <div id="bootStatus" class="status">正在连接 Firebase，并创建匿名身份…</div>
@@ -134,15 +140,15 @@
         <div class="slot">PLAYER A</div>
         <div id="nameA" class="name">等待中…</div>
         <div id="onlineA" class="presence">⚪ 离线</div>
-        <div id="ticketsA" class="tickets">🎫 —</div>
-        <button id="useTicketA" class="danger hidden" style="width:100%;margin-top:10px">使用我的 1 张券</button>
+        <div id="ticketsA" class="tickets hidden">🎫 —</div>
+        <button id="useTicketA" class="danger hidden">使用我的 1 张券</button>
       </div>
       <div id="playerB" class="player">
         <div class="slot">PLAYER B</div>
         <div id="nameB" class="name">等待加入…</div>
         <div id="onlineB" class="presence">⚪ 离线</div>
-        <div id="ticketsB" class="tickets">🎫 —</div>
-        <button id="useTicketB" class="danger hidden" style="width:100%;margin-top:10px">使用我的 1 张券</button>
+        <div id="ticketsB" class="tickets hidden">🎫 —</div>
+        <button id="useTicketB" class="danger hidden">使用我的 1 张券</button>
       </div>
     </div>
 
@@ -150,17 +156,16 @@
       <div id="rescueBanner" class="rescueBanner hidden">🇨🇳 中文救援 · <span id="rescueTimer">00:30</span></div>
       <div id="turnBanner" class="turnBanner">准备开始</div>
 
+      <div id="deckPicker" class="hidden">
+        <div class="deckButtons">
+          <button class="deckTab deckDaily active" data-select-card-type="daily">🟢 Daily</button>
+          <button class="deckTab deckTalk" data-select-card-type="talk">🟠 Talk</button>
+          <button class="deckTab deckDescribe" data-select-card-type="describe">🔵 Describe</button>
+        </div>
+      </div>
+
       <div class="cardStage">
         <div id="gameHint" class="small">等待回合状态…</div>
-
-        <div id="deckPicker" class="hidden">
-          <div class="cardText" style="font-size:22px">选择一种卡牌</div>
-          <div class="deckButtons">
-            <button class="deckDaily" data-card-type="daily">🟢 Daily</button>
-            <button class="deckTalk" data-card-type="talk">🟠 Talk</button>
-            <button class="deckDescribe" data-card-type="describe">🔵 Describe</button>
-          </div>
-        </div>
 
         <div id="privateCard" class="hidden">
           <div id="privateCardType" class="cardType">DAILY</div>
@@ -175,9 +180,26 @@
         </div>
       </div>
 
+      <div id="drawControls" class="drawControls hidden">
+        <button id="drawCurrentBtn" class="primary">🎴 从当前牌堆抽一张</button>
+        <button id="drawRandomBtn" class="secondary">🎲 三类随机抽一张</button>
+      </div>
+
       <div id="gameActions" class="gameActions hidden">
-        <button id="changeCardBtn" class="secondary">换一张</button>
         <button id="endTurnBtn" class="primary">结束回合</button>
+      </div>
+
+      <div id="ticketShelf" class="ticketShelf">
+        <div class="ticketCard">
+          <div class="small">🎫 你的中文救援券</div>
+          <div id="myTicketCount" class="ticketValue">—</div>
+          <button id="useMyTicketBtn" class="danger" style="width:100%">使用我的 1 张券</button>
+        </div>
+        <div class="ticketCard">
+          <div id="otherTicketLabel" class="small">🎫 对方的中文救援券</div>
+          <div id="otherTicketCount" class="ticketValue">—</div>
+          <div class="small">只能由对方本人使用</div>
+        </div>
       </div>
     </div>
 
@@ -228,6 +250,7 @@
   let privateCard = null;
   let privateCardLoadKey = null;
   let cardIndexCache = {};
+  let selectedCardType = "daily";
   let dbConnected = false;
   let serverTimeOffset = 0;
   let unsubPlayers = null;
@@ -382,8 +405,10 @@
 
     paintPresence("A",onlineA);
     paintPresence("B",onlineB);
-    $("useTicketA").classList.toggle("hidden", !(playing && mySlot==="A"));
-    $("useTicketB").classList.toggle("hidden", !(playing && mySlot==="B"));
+    hide($("useTicketA"));
+    hide($("useTicketB"));
+    hide($("ticketsA"));
+    hide($("ticketsB"));
     $("startBox").classList.toggle("hidden",playing);
     $("gamePanel").classList.toggle("hidden",!playing);
 
@@ -411,8 +436,12 @@
     }
 
     const mine=mySlot==="A"?roomPlayers.A:roomPlayers.B;
-    const btn=mySlot==="A"?$("useTicketA"):$("useTicketB");
-    if(btn) btn.disabled=!(playing && mine && typeof mine.tickets==="number" && mine.tickets>0 && !activeRescue());
+    const otherSlot=mySlot==="A"?"B":"A";
+    const other=roomPlayers[otherSlot];
+    $("myTicketCount").textContent=mine?.tickets??"—";
+    $("otherTicketCount").textContent=other?.tickets??"—";
+    $("otherTicketLabel").textContent=`🎫 ${other?.name||"对方"}的中文救援券`;
+    $("useMyTicketBtn").disabled=!(playing && mine && typeof mine.tickets==="number" && mine.tickets>0 && !activeRescue());
     renderGameUI();
   }
 
@@ -445,15 +474,21 @@
     $("turnBanner").textContent=myTurn?"🎤 轮到你了":"👂 "+turnName+" 的回合";
 
     hide($("deckPicker"));
+    hide($("drawControls"));
     hide($("privateCard"));
     hide($("listenerCard"));
     hide($("gameActions"));
 
     if(myTurn){
+      show($("deckPicker"));
+      show($("drawControls"));
+      document.querySelectorAll("[data-select-card-type]").forEach(button=>{
+        button.classList.toggle("active",button.dataset.selectCardType===selectedCardType);
+      });
+      $("drawCurrentBtn").textContent=privateCard?"🎴 从当前牌堆换一张":"🎴 从当前牌堆抽一张";
       if(!gameState.cardType){
-        $("gameHint").textContent="抽一张卡，开始这一回合。";
+        $("gameHint").innerHTML="<div class=\"cardText\" style=\"font-size:24px\">点击「抽一张」开始</div><div class=\"small\">可以先选择牌堆，也可以让三类随机决定。</div>";
         show($("gameHint"));
-        show($("deckPicker"));
       }else if(privateCard){
         hide($("gameHint"));
         $("privateCardType").textContent=typeLabels[privateCard.type]||privateCard.type;
@@ -489,6 +524,7 @@
       const card=textSnap.val();
       if(card?.text){
         privateCard={id:cardId,type:card.type,text:card.text};
+        selectedCardType=card.type;
         renderGameUI();
       }
     }catch(err){
@@ -509,8 +545,10 @@
 
   async function drawCard(type){
     if(gameStatus!=="playing"||gameState.turn!==mySlot||!currentRoom) return;
-    document.querySelectorAll("[data-card-type]").forEach(btn=>btn.disabled=true);
-    $("changeCardBtn").disabled=true;
+    if(!type) return;
+    document.querySelectorAll("[data-select-card-type]").forEach(btn=>btn.disabled=true);
+    $("drawCurrentBtn").disabled=true;
+    $("drawRandomBtn").disabled=true;
     try{
       const usedSnap=await get(ref(db,`rooms/${currentRoom}/usedCards`));
       const used=usedSnap.val()||{};
@@ -526,6 +564,7 @@
       const card=textSnap.val();
       if(!card?.text) throw new Error("题目正文读取失败。");
       privateCard={id:cardId,type:card.type,text:card.text};
+      selectedCardType=card.type;
       roomUsedCards[cardId]=true;
       renderGameUI();
       await touchRoomActivity();
@@ -533,8 +572,28 @@
       alert("抽卡失败："+(err.message||err));
       console.error(err);
     }finally{
-      document.querySelectorAll("[data-card-type]").forEach(btn=>btn.disabled=false);
-      $("changeCardBtn").disabled=false;
+      document.querySelectorAll("[data-select-card-type]").forEach(btn=>btn.disabled=false);
+      $("drawCurrentBtn").disabled=false;
+      $("drawRandomBtn").disabled=false;
+    }
+  }
+
+  async function drawRandomCard(){
+    if(gameStatus!=="playing"||gameState.turn!==mySlot||!currentRoom) return;
+    try{
+      const usedSnap=await get(ref(db,`rooms/${currentRoom}/usedCards`));
+      const used=usedSnap.val()||{};
+      const available=[];
+      for(const type of ["daily","talk","describe"]){
+        if((await getDeckIds(type)).some(id=>!used[id])) available.push(type);
+      }
+      if(!available.length) throw new Error("三个牌堆都已经抽完了。");
+      const type=available[Math.floor(Math.random()*available.length)];
+      selectedCardType=type;
+      await drawCard(type);
+    }catch(err){
+      alert("随机抽卡失败："+(err.message||err));
+      console.error(err);
     }
   }
 
@@ -781,6 +840,7 @@
 
   async function startGame(){
     if(mySlot!=="A"||!currentRoom) return;
+    if(!confirm("两位玩家都在线。现在正式开始游戏吗？")) return;
     $("startBtn").disabled=true;
     try{
       if(!(roomPlayers.A?.uid&&roomPlayers.B?.uid&&slotIsOnline("A")&&slotIsOnline("B"))){
@@ -867,10 +927,15 @@
   $("startBtn").addEventListener("click",startGame);
   $("useTicketA").addEventListener("click",()=>useMyTicket("A"));
   $("useTicketB").addEventListener("click",()=>useMyTicket("B"));
-  document.querySelectorAll("[data-card-type]").forEach(button=>{
-    button.addEventListener("click",()=>drawCard(button.dataset.cardType));
+  $("useMyTicketBtn").addEventListener("click",()=>useMyTicket(mySlot));
+  document.querySelectorAll("[data-select-card-type]").forEach(button=>{
+    button.addEventListener("click",()=>{
+      selectedCardType=button.dataset.selectCardType;
+      renderGameUI();
+    });
   });
-  $("changeCardBtn").addEventListener("click",()=>drawCard(privateCard?.type||gameState.cardType));
+  $("drawCurrentBtn").addEventListener("click",()=>drawCard(selectedCardType));
+  $("drawRandomBtn").addEventListener("click",drawRandomCard);
   $("endTurnBtn").addEventListener("click",endTurn);
   $("homeBtn").addEventListener("click",()=>goHome({keepSession:true}));
   $("leaveRoomBtn").addEventListener("click",leaveRoom);
@@ -894,8 +959,7 @@
     updateRescueUI();
     if(gameStatus==="playing"&&mySlot){
       const mine=roomPlayers[mySlot];
-      const btn=mySlot==="A"?$("useTicketA"):$("useTicketB");
-      btn.disabled=!(mine&&typeof mine.tickets==="number"&&mine.tickets>0&&!activeRescue());
+      $("useMyTicketBtn").disabled=!(mine&&typeof mine.tickets==="number"&&mine.tickets>0&&!activeRescue());
     }
   },500);
 
