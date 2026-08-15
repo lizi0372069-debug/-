@@ -60,13 +60,28 @@
       background:#faf8f3;text-align:center;
     }
     .recovery{border:1px solid var(--line);border-radius:16px;padding:14px;background:#faf8f3;margin:14px 0}
+    .gamePanel{margin-top:16px;border:2px solid #222;border-radius:20px;padding:16px;background:#fff}
+    .turnBanner{text-align:center;font-size:22px;font-weight:900;margin-bottom:12px}
+    .rescueBanner{
+      padding:13px;border-radius:14px;background:#fff3c9;color:#6b4b00;text-align:center;
+      font-weight:900;font-size:18px;margin-bottom:12px;
+    }
+    .cardStage{border:1px solid var(--line);border-radius:18px;padding:18px;background:#faf8f3;text-align:center;min-height:210px}
+    .cardType{font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+    .cardText{font-size:28px;font-weight:900;line-height:1.45;margin:18px 0}
+    .deckButtons{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px}
+    .deckDaily{background:#e6f5e9;color:#235d31}
+    .deckTalk{background:#fff0dd;color:#7a4611}
+    .deckDescribe{background:#e7efff;color:#264f91}
+    .gameActions{display:flex;gap:10px;margin-top:12px}
+    .gameActions>*{flex:1}
     @media(max-width:520px){.players{grid-template-columns:1fr}.row{flex-direction:column}}
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>不讲中文交流会 🎴</h1>
-  <div class="sub">v0.3.2 联机测试 · 在线状态 + 房间生命周期</div>
+  <div class="sub">v0.4.0 · 双人实时抽卡游戏</div>
 
   <div id="bootPanel" class="panel">
     <div id="bootStatus" class="status">正在连接 Firebase，并创建匿名身份…</div>
@@ -131,6 +146,41 @@
       </div>
     </div>
 
+    <div id="gamePanel" class="gamePanel hidden">
+      <div id="rescueBanner" class="rescueBanner hidden">🇨🇳 中文救援 · <span id="rescueTimer">00:30</span></div>
+      <div id="turnBanner" class="turnBanner">准备开始</div>
+
+      <div class="cardStage">
+        <div id="gameHint" class="small">等待回合状态…</div>
+
+        <div id="deckPicker" class="hidden">
+          <div class="cardText" style="font-size:22px">选择一种卡牌</div>
+          <div class="deckButtons">
+            <button class="deckDaily" data-card-type="daily">🟢 Daily</button>
+            <button class="deckTalk" data-card-type="talk">🟠 Talk</button>
+            <button class="deckDescribe" data-card-type="describe">🔵 Describe</button>
+          </div>
+        </div>
+
+        <div id="privateCard" class="hidden">
+          <div id="privateCardType" class="cardType">DAILY</div>
+          <div id="privateCardText" class="cardText">正在抽题…</div>
+          <div id="privateCardNote" class="small">只有你能看到这张题目。</div>
+        </div>
+
+        <div id="listenerCard" class="hidden">
+          <div id="listenerCardType" class="cardType">等待抽题</div>
+          <div id="listenerCardText" class="cardText">认真听 👂</div>
+          <div class="small">题目正文不会发送到你的浏览器。</div>
+        </div>
+      </div>
+
+      <div id="gameActions" class="gameActions hidden">
+        <button id="changeCardBtn" class="secondary">换一张</button>
+        <button id="endTurnBtn" class="primary">结束回合</button>
+      </div>
+    </div>
+
     <div id="startBox" class="startBox">
       <div id="startText" class="small">等待另一位玩家在线后开始。</div>
       <button id="startBtn" class="primary hidden" style="width:100%;margin-top:10px">开始游戏</button>
@@ -146,7 +196,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
   import {
-    getDatabase, ref, set, get, update, remove, onValue, runTransaction,
+    getDatabase, ref, set, get, update, remove, onValue,
     onDisconnect, serverTimestamp, push
   } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
 
@@ -172,12 +222,18 @@
   let mySlot = null;
   let roomPlayers = {};
   let roomPresence = {};
+  let roomUsedCards = {};
+  let gameState = {status:"lobby",turn:"A",cardType:null,rescue:null};
   let gameStatus = "lobby";
+  let privateCard = null;
+  let privateCardLoadKey = null;
+  let cardIndexCache = {};
   let dbConnected = false;
   let serverTimeOffset = 0;
   let unsubPlayers = null;
   let unsubPresence = null;
   let unsubStatus = null;
+  let unsubUsedCards = null;
   let presenceConnectionId = null;
   let presenceDisconnect = null;
   let presenceStarting = false;
@@ -328,6 +384,8 @@
     paintPresence("B",onlineB);
     $("useTicketA").classList.toggle("hidden", !(playing && mySlot==="A"));
     $("useTicketB").classList.toggle("hidden", !(playing && mySlot==="B"));
+    $("startBox").classList.toggle("hidden",playing);
+    $("gamePanel").classList.toggle("hidden",!playing);
 
     if(playing){
       $("startText").textContent=bothOnline?"🎮 游戏进行中。双方都在线。":"🎮 游戏进行中，正在等待另一位玩家回来…";
@@ -354,7 +412,151 @@
 
     const mine=mySlot==="A"?roomPlayers.A:roomPlayers.B;
     const btn=mySlot==="A"?$("useTicketA"):$("useTicketB");
-    if(btn) btn.disabled=!(playing && mine && typeof mine.tickets==="number" && mine.tickets>0);
+    if(btn) btn.disabled=!(playing && mine && typeof mine.tickets==="number" && mine.tickets>0 && !activeRescue());
+    renderGameUI();
+  }
+
+  const typeLabels={daily:"🟢 Daily",talk:"🟠 Talk",describe:"🔵 Describe"};
+
+  function activeRescue(){
+    const started=gameState.rescue?.startedAt;
+    return typeof started==="number" && serverNow()-started<30000;
+  }
+
+  function updateRescueUI(){
+    const started=gameState.rescue?.startedAt;
+    const by=gameState.rescue?.by;
+    const remaining=typeof started==="number"?Math.max(0,Math.ceil((started+30000-serverNow())/1000)):0;
+    if(remaining>0){
+      const name=roomPlayers[by]?.name||`Player ${by||"?"}`;
+      $("rescueBanner").innerHTML=`🇨🇳 ${name} 的中文救援 · <span id="rescueTimer">00:${String(remaining).padStart(2,"0")}</span>`;
+      show($("rescueBanner"));
+    }else{
+      hide($("rescueBanner"));
+    }
+  }
+
+  function renderGameUI(){
+    if(gameStatus!=="playing") return;
+    updateRescueUI();
+    const turn=gameState.turn||"A";
+    const myTurn=turn===mySlot;
+    const turnName=roomPlayers[turn]?.name||`Player ${turn}`;
+    $("turnBanner").textContent=myTurn?"🎤 轮到你了":"👂 "+turnName+" 的回合";
+
+    hide($("deckPicker"));
+    hide($("privateCard"));
+    hide($("listenerCard"));
+    hide($("gameActions"));
+
+    if(myTurn){
+      if(!gameState.cardType){
+        $("gameHint").textContent="抽一张卡，开始这一回合。";
+        show($("gameHint"));
+        show($("deckPicker"));
+      }else if(privateCard){
+        hide($("gameHint"));
+        $("privateCardType").textContent=typeLabels[privateCard.type]||privateCard.type;
+        $("privateCardText").textContent=privateCard.text;
+        $("privateCardNote").textContent=privateCard.type==="describe"?"描述这个词，但不要说出答案。只有你能看到答案。":"用目标语言回答；可以自然追问和展开。只有你能看到题面。";
+        $("endTurnBtn").textContent=privateCard.type==="describe"?"猜到了 · 结束回合":"结束回合";
+        show($("privateCard"));
+        show($("gameActions"));
+      }else{
+        $("gameHint").textContent="正在读取你的私有题面…";
+        show($("gameHint"));
+      }
+    }else{
+      hide($("gameHint"));
+      $("listenerCardType").textContent=gameState.cardType?(typeLabels[gameState.cardType]||gameState.cardType):"正在选牌";
+      $("listenerCardText").textContent=gameState.cardType==="describe"?"听描述并猜答案 👂":gameState.cardType?"认真听，可以继续追问 👂":"等待对方抽一张卡…";
+      show($("listenerCard"));
+    }
+  }
+
+  async function ensureMyPrivateCard(){
+    if(gameStatus!=="playing"||gameState.turn!==mySlot||!gameState.cardType||!currentRoom) return;
+    const loadKey=`${currentRoom}:${mySlot}:${gameState.turn}:${gameState.cardType}`;
+    if(privateCard&&privateCard.type===gameState.cardType) return;
+    if(privateCardLoadKey===loadKey) return;
+    privateCardLoadKey=loadKey;
+    try{
+      const idSnap=await get(ref(db,`rooms/${currentRoom}/private/${mySlot}/currentCardId`));
+      const cardId=idSnap.val();
+      if(!cardId) return;
+      const textSnap=await get(ref(db,`cardTexts/${cardId}`));
+      if(loadKey!==privateCardLoadKey||gameState.turn!==mySlot) return;
+      const card=textSnap.val();
+      if(card?.text){
+        privateCard={id:cardId,type:card.type,text:card.text};
+        renderGameUI();
+      }
+    }catch(err){
+      console.error("读取私有题面失败",err);
+      $("gameHint").textContent="私有题面读取失败，请确认 v0.4 Rules 和题库已经发布。";
+    }finally{
+      if(privateCardLoadKey===loadKey) privateCardLoadKey=null;
+    }
+  }
+
+  async function getDeckIds(type){
+    if(!cardIndexCache[type]){
+      const snap=await get(ref(db,`cardIndex/${type}`));
+      cardIndexCache[type]=Object.keys(snap.val()||{});
+    }
+    return cardIndexCache[type];
+  }
+
+  async function drawCard(type){
+    if(gameStatus!=="playing"||gameState.turn!==mySlot||!currentRoom) return;
+    document.querySelectorAll("[data-card-type]").forEach(btn=>btn.disabled=true);
+    $("changeCardBtn").disabled=true;
+    try{
+      const usedSnap=await get(ref(db,`rooms/${currentRoom}/usedCards`));
+      const used=usedSnap.val()||{};
+      const candidates=(await getDeckIds(type)).filter(id=>!used[id]);
+      if(!candidates.length) throw new Error(`${typeLabels[type]} 已经没有未使用的卡了。`);
+      const cardId=candidates[Math.floor(Math.random()*candidates.length)];
+      await update(ref(db,`rooms/${currentRoom}`),{
+        [`private/${mySlot}/currentCardId`]:cardId,
+        [`usedCards/${cardId}`]:true,
+        "state/cardType":type
+      });
+      const textSnap=await get(ref(db,`cardTexts/${cardId}`));
+      const card=textSnap.val();
+      if(!card?.text) throw new Error("题目正文读取失败。");
+      privateCard={id:cardId,type:card.type,text:card.text};
+      roomUsedCards[cardId]=true;
+      renderGameUI();
+      await touchRoomActivity();
+    }catch(err){
+      alert("抽卡失败："+(err.message||err));
+      console.error(err);
+    }finally{
+      document.querySelectorAll("[data-card-type]").forEach(btn=>btn.disabled=false);
+      $("changeCardBtn").disabled=false;
+    }
+  }
+
+  async function endTurn(){
+    if(gameStatus!=="playing"||gameState.turn!==mySlot||!currentRoom||!gameState.cardType) return;
+    const next=mySlot==="A"?"B":"A";
+    $("endTurnBtn").disabled=true;
+    try{
+      await update(ref(db,`rooms/${currentRoom}`),{
+        [`private/${mySlot}/currentCardId`]:null,
+        "state/cardType":null,
+        "state/turn":next
+      });
+      privateCard=null;
+      privateCardLoadKey=null;
+      await touchRoomActivity();
+    }catch(err){
+      alert("结束回合失败："+(err.message||err));
+      console.error(err);
+    }finally{
+      $("endTurnBtn").disabled=false;
+    }
   }
 
   async function touchRoomActivity(code=currentRoom){
@@ -441,7 +643,8 @@
     if(unsubPlayers) unsubPlayers();
     if(unsubPresence) unsubPresence();
     if(unsubStatus) unsubStatus();
-    unsubPlayers=null;unsubPresence=null;unsubStatus=null;
+    if(unsubUsedCards) unsubUsedCards();
+    unsubPlayers=null;unsubPresence=null;unsubStatus=null;unsubUsedCards=null;
   }
 
   async function enterRoom(code,slot){
@@ -454,6 +657,7 @@
     currentRoom=code;
     mySlot=slot;
     saveSession(code,slot);
+    await set(ref(db,`sessions/${uid}`),{roomId:code,slot});
     hide($("homePanel"));
     hide($("bootPanel"));
     show($("roomPanel"));
@@ -483,12 +687,23 @@
       setStatus($("roomStatus"),"读取在线状态失败："+err.message,"bad");
       console.error(err);
     });
-    unsubStatus=onValue(ref(db,`rooms/${code}/state/status`),snap=>{
-      gameStatus=snap.val()||"lobby";
+    unsubStatus=onValue(ref(db,`rooms/${code}/state`),snap=>{
+      const previousTurn=gameState.turn;
+      const previousType=gameState.cardType;
+      gameState=snap.val()||{status:"lobby",turn:"A"};
+      gameStatus=gameState.status||"lobby";
+      if(previousTurn!==gameState.turn||previousType!==gameState.cardType){
+        privateCard=null;
+        privateCardLoadKey=null;
+      }
       refreshLobbyUI();
+      ensureMyPrivateCard();
     },err=>{
       setStatus($("roomStatus"),"读取游戏状态失败："+err.message,"bad");
       console.error(err);
+    });
+    unsubUsedCards=onValue(ref(db,`rooms/${code}/usedCards`),snap=>{
+      roomUsedCards=snap.val()||{};
     });
 
     startHeartbeat();
@@ -499,7 +714,8 @@
     teardownRoomListeners();
     stopHeartbeat();
     await stopPresence();
-    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};roomUsedCards={};
+    gameState={status:"lobby",turn:"A",cardType:null,rescue:null};gameStatus="lobby";privateCard=null;
     if(!keepSession) clearSession();
     hide($("roomPanel"));
     show($("homePanel"));
@@ -512,7 +728,8 @@
     stopHeartbeat();
     presenceGeneration++;
     presenceConnectionId=null;presenceDisconnect=null;
-    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};roomUsedCards={};
+    gameState={status:"lobby",turn:"A",cardType:null,rescue:null};gameStatus="lobby";privateCard=null;
     clearSession();
     hide($("roomPanel"));
     show($("homePanel"));
@@ -580,12 +797,14 @@
 
   async function useMyTicket(slot){
     if(slot!==mySlot||!currentRoom||gameStatus!=="playing") return;
-    const ticketRef=ref(db,`rooms/${currentRoom}/players/${slot}/tickets`);
+    const tickets=roomPlayers[slot]?.tickets;
+    if(typeof tickets!=="number"||tickets<=0) return;
+    if(activeRescue()) return alert("当前中文救援还没结束，请等倒计时归零。");
     try{
-      await runTransaction(ticketRef,current=>{
-        if(typeof current!=="number"||current<=0) return;
-        return current-1;
-      },{applyLocally:false});
+      await update(ref(db,`rooms/${currentRoom}`),{
+        [`players/${slot}/tickets`]:tickets-1,
+        "state/rescue":{by:slot,startedAt:serverTimestamp()}
+      });
       await touchRoomActivity();
     }catch(err){
       alert("使用券失败："+(err.message||err));
@@ -604,7 +823,9 @@
       alert("离开房间失败："+(err.message||err));
       return;
     }
-    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    try{await remove(ref(db,`sessions/${uid}`));}catch{}
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};roomUsedCards={};
+    gameState={status:"lobby",turn:"A",cardType:null,rescue:null};gameStatus="lobby";privateCard=null;
     clearSession();
     hide($("roomPanel"));
     show($("homePanel"));
@@ -621,7 +842,9 @@
       alert("结束房间失败："+(err.message||err));
       return;
     }
-    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    try{await remove(ref(db,`sessions/${uid}`));}catch{}
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};roomUsedCards={};
+    gameState={status:"lobby",turn:"A",cardType:null,rescue:null};gameStatus="lobby";privateCard=null;
     clearSession();
     hide($("roomPanel"));
     show($("homePanel"));
@@ -644,6 +867,11 @@
   $("startBtn").addEventListener("click",startGame);
   $("useTicketA").addEventListener("click",()=>useMyTicket("A"));
   $("useTicketB").addEventListener("click",()=>useMyTicket("B"));
+  document.querySelectorAll("[data-card-type]").forEach(button=>{
+    button.addEventListener("click",()=>drawCard(button.dataset.cardType));
+  });
+  $("changeCardBtn").addEventListener("click",()=>drawCard(privateCard?.type||gameState.cardType));
+  $("endTurnBtn").addEventListener("click",endTurn);
   $("homeBtn").addEventListener("click",()=>goHome({keepSession:true}));
   $("leaveRoomBtn").addEventListener("click",leaveRoom);
   $("endRoomBtn").addEventListener("click",endRoom);
@@ -661,6 +889,15 @@
   const roomFromUrl=cleanRoomCode(new URL(location.href).searchParams.get("room"));
   if(roomFromUrl) $("roomInput").value=roomFromUrl;
   $("nameInput").value=localStorage.getItem("nc_name")||"";
+
+  setInterval(()=>{
+    updateRescueUI();
+    if(gameStatus==="playing"&&mySlot){
+      const mine=roomPlayers[mySlot];
+      const btn=mySlot==="A"?$("useTicketA"):$("useTicketB");
+      btn.disabled=!(mine&&typeof mine.tickets==="number"&&mine.tickets>0&&!activeRescue());
+    }
+  },500);
 
   onValue(ref(db,".info/serverTimeOffset"),snap=>{
     serverTimeOffset=Number(snap.val())||0;
