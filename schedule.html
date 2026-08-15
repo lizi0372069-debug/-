@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>预约时间 · 不讲中文交流会</title>
+  <style>
+    :root{
+      --bg:#f6f3ed;--panel:#fffdf8;--text:#222;--muted:#706b63;--line:#ddd6ca;
+      --soft:#eee9df;--good:#e9f7ed;--good-text:#226338;--bad:#fff0ed;--accent:#222;
+      --gold:#fff3c9;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    .wrap{max-width:760px;margin:auto;padding:24px 16px 56px}
+    h1{margin:6px 0 2px;text-align:center;font-size:38px}
+    h2{font-size:23px;margin:0 0 6px}
+    h3{font-size:17px;margin:0 0 4px}
+    .sub{text-align:center;color:var(--muted);margin-bottom:18px;line-height:1.55}
+    .panel{
+      background:var(--panel);border:1px solid var(--line);border-radius:22px;
+      padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.06);margin-bottom:14px;
+    }
+    .hidden{display:none!important}
+    .topLink{display:inline-block;color:var(--muted);font-weight:800;text-decoration:none;margin-bottom:10px}
+    label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+    input{
+      width:100%;padding:14px;border:1px solid var(--line);border-radius:14px;
+      font:inherit;background:white;color:var(--text);
+    }
+    button,.buttonLink{
+      border:0;border-radius:14px;padding:13px 16px;font:inherit;font-weight:800;
+      cursor:pointer;touch-action:manipulation;text-align:center;text-decoration:none;
+    }
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .buttonLink{display:block}
+    .primary{background:#222;color:white}
+    .secondary{background:var(--soft);color:#222}
+    .danger{background:#f4dfda;color:#5f251b}
+    .row{display:flex;gap:10px;margin-top:12px}
+    .row>*{flex:1}
+    .status{padding:12px 14px;border-radius:14px;background:var(--soft);font-size:14px;line-height:1.55;margin-bottom:12px}
+    .status.good{background:var(--good);color:var(--good-text)}
+    .status.bad{background:var(--bad);color:#7c2d20}
+    .small{font-size:12px;color:var(--muted);line-height:1.55}
+    .eyebrow{font-size:11px;color:var(--muted);font-weight:900;letter-spacing:.1em;margin-bottom:5px}
+    .code{font-size:30px;font-weight:900;letter-spacing:.12em;text-align:center;margin:8px 0}
+    .zoneBox{padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:#faf8f3;margin-top:12px}
+    .zoneBox strong{display:block;margin-bottom:3px}
+    .people{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+    .person{border:1px solid var(--line);border-radius:14px;background:white;padding:11px 12px}
+    .person.me{outline:2px solid #222}
+    .personName{font-weight:900;margin:2px 0}
+    .sectionHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+    .timeForm{padding:14px;border:1px solid var(--line);border-radius:16px;background:#faf8f3;margin-bottom:14px}
+    .timeInputs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .timeList{display:grid;gap:9px}
+    .timeItem{border:1px solid var(--line);border-radius:15px;background:white;padding:12px;display:flex;gap:10px;align-items:center}
+    .timeItem.overlap{background:var(--good);border-color:#b8ddc2}
+    .timeText{flex:1;min-width:0}
+    .timeMain{font-weight:900;line-height:1.45}
+    .dualTime{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);color:#4f4a43}
+    .timeActions{display:flex;gap:7px;flex-shrink:0}
+    .mini{padding:8px 10px;font-size:12px;border-radius:10px}
+    .empty{padding:18px;border:1px dashed var(--line);border-radius:15px;text-align:center;color:var(--muted);font-size:13px}
+    .overlapPanel{background:#f1fbf3;border-color:#b8ddc2}
+    .celebrate{font-size:19px;font-weight:900;color:var(--good-text);margin-bottom:10px}
+    .confirmed{background:var(--gold);border:1px solid #eadb9a;border-radius:16px;padding:15px;margin-bottom:12px}
+    .confirmedTime{font-size:20px;font-weight:900;line-height:1.45;margin:4px 0}
+    .toast{
+      position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10;
+      width:min(440px,calc(100% - 32px));background:#222;color:white;border-radius:16px;
+      padding:14px 16px;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.2);
+    }
+    @media(max-width:560px){
+      h1{font-size:32px}
+      .row,.timeInputs{grid-template-columns:1fr;flex-direction:column}
+      .people{grid-template-columns:1fr 1fr}
+      .timeItem{align-items:flex-start;flex-direction:column}
+      .timeActions{width:100%}.timeActions>*{flex:1}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <a class="topLink" href="index.html">← 回到交流会</a>
+  <h1>一起找时间 🗓️</h1>
+  <div class="sub">各自填写方便的时间，网页会自动换算时区并找出重叠。</div>
+
+  <div id="bootPanel" class="panel">
+    <div id="bootStatus" class="status">正在连接，并创建匿名身份…</div>
+  </div>
+
+  <div id="landingPanel" class="panel hidden">
+    <div class="status good">✅ 不需要注册。预约链接就是你们两个人的共享时间表。</div>
+    <h2>创建新的预约表</h2>
+    <label>你的名字</label>
+    <input id="creatorName" maxlength="24" placeholder="例如 Lii" />
+    <label>这次约什么？</label>
+    <input id="planTitle" maxlength="60" value="不讲中文交流会" />
+    <label>你现在使用的时区</label>
+    <input id="creatorZone" list="zoneOptions" autocomplete="off" />
+    <div id="creatorZonePreview" class="zoneBox small"></div>
+    <button id="createPlanBtn" class="primary" style="width:100%;margin-top:14px">创建共享预约表</button>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:22px 0">
+    <h3>打开已有预约</h3>
+    <label>预约码</label>
+    <input id="planCodeInput" maxlength="8" placeholder="输入 8 位预约码" autocomplete="off" />
+    <button id="openPlanBtn" class="secondary" style="width:100%;margin-top:10px">打开预约表</button>
+  </div>
+
+  <div id="joinPanel" class="panel hidden">
+    <div class="eyebrow">朋友邀请你一起找时间</div>
+    <h2 id="joinTitle">不讲中文交流会</h2>
+    <div id="joinCreator" class="small"></div>
+    <label>你的名字</label>
+    <input id="participantName" maxlength="24" placeholder="例如 梨子" />
+    <label>你现在使用的时区</label>
+    <input id="participantZone" list="zoneOptions" autocomplete="off" />
+    <div id="participantZonePreview" class="zoneBox small"></div>
+    <button id="joinPlanBtn" class="primary" style="width:100%;margin-top:14px">加入并填写我的时间</button>
+    <a class="buttonLink secondary" href="schedule.html" style="margin-top:10px">返回预约首页</a>
+  </div>
+
+  <div id="fullPanel" class="panel hidden">
+    <div class="status bad">这张预约表已经有两位参与者了。</div>
+    <a class="buttonLink secondary" href="schedule.html">创建我自己的预约表</a>
+  </div>
+
+  <div id="planPanel" class="hidden">
+    <div class="panel">
+      <div id="planStatus" class="status">正在读取预约表…</div>
+      <div class="eyebrow">共享预约表</div>
+      <h2 id="detailTitle">不讲中文交流会</h2>
+      <div class="small" style="text-align:center;margin-top:12px">预约码</div>
+      <div id="planCode" class="code">--------</div>
+      <div class="row">
+        <button id="copyPlanCodeBtn" class="secondary">复制预约码</button>
+        <button id="copyPlanLinkBtn" class="secondary">复制邀请链接</button>
+      </div>
+      <div class="people">
+        <div id="personA" class="person">
+          <div class="eyebrow">发起者</div><div id="personAName" class="personName">—</div><div id="personAZone" class="small">—</div>
+        </div>
+        <div id="personB" class="person">
+          <div class="eyebrow">朋友</div><div id="personBName" class="personName">等待加入…</div><div id="personBZone" class="small">—</div>
+        </div>
+      </div>
+      <label>我的显示时区</label>
+      <div class="row" style="margin-top:0">
+        <input id="myZone" list="zoneOptions" autocomplete="off" />
+        <button id="saveZoneBtn" class="secondary">更新时间显示</button>
+      </div>
+      <div id="myZonePreview" class="zoneBox small"></div>
+    </div>
+
+    <div id="confirmedPanel" class="panel hidden">
+      <div class="confirmed">
+        <div class="eyebrow">已经选定</div>
+        <div id="confirmedTime" class="confirmedTime"></div>
+        <div id="confirmedOtherTime" class="small dualTime"></div>
+        <div id="confirmedMeta" class="small"></div>
+      </div>
+      <div class="row">
+        <button id="calendarBtn" class="secondary">加入系统日历</button>
+        <a class="buttonLink primary" href="index.html">到时间后进入交流会</a>
+      </div>
+      <div class="small" style="margin-top:9px">之后如果有人修改可用时间，导致这个时间不再重叠，网页会立即提醒重新选择。</div>
+    </div>
+
+    <div id="overlapPanel" class="panel overlapPanel hidden">
+      <div class="celebrate">🎉 找到双方都方便的时间</div>
+      <div class="small" style="margin-bottom:10px">以下都按你当前选择的时区显示。任意一方都可以选定最终时间。</div>
+      <div id="overlapList" class="timeList"></div>
+    </div>
+
+    <div class="panel">
+      <div class="sectionHead">
+        <div><div class="eyebrow">我的时间</div><h2>我什么时候方便？</h2></div>
+        <div class="small">可随时增删或修改</div>
+      </div>
+      <div class="timeForm">
+        <div class="timeInputs">
+          <div><label>开始（精确到 30 分钟）</label><input id="availableStart" type="datetime-local" step="1800" /></div>
+          <div><label>结束（精确到 30 分钟）</label><input id="availableEnd" type="datetime-local" step="1800" /></div>
+        </div>
+        <div id="timeFormHint" class="small" style="margin-top:8px"></div>
+        <div class="row">
+          <button id="saveTimeBtn" class="primary">确认这段时间我可以</button>
+          <button id="cancelEditBtn" class="secondary hidden">取消修改</button>
+        </div>
+      </div>
+      <div id="myTimeList" class="timeList"></div>
+    </div>
+
+    <div class="panel">
+      <div class="eyebrow">对方的时间</div>
+      <h2 id="otherTimesTitle">等待朋友填写</h2>
+      <div class="small" style="margin-bottom:12px">这里已经自动换算成你的显示时区，不需要自己加减小时。</div>
+      <div id="otherTimeList" class="timeList"></div>
+    </div>
+
+    <div class="panel">
+      <div class="small">网页打开时，双方的修改会实时同步；出现新的重叠时间会立即在页面内提示。关闭网页后不会发送微信、短信或邮件提醒。</div>
+      <div class="row">
+        <a class="buttonLink secondary" href="schedule.html">回到预约首页</a>
+        <button id="deletePlanBtn" class="danger hidden">删除预约表</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <datalist id="zoneOptions">
+    <option value="Asia/Shanghai">中国 · 上海</option>
+    <option value="Asia/Tokyo">日本 · 东京</option>
+    <option value="Europe/London">英国 · 伦敦</option>
+    <option value="Europe/Paris">欧洲 · 巴黎</option>
+    <option value="America/New_York">美国 · 纽约</option>
+    <option value="America/Los_Angeles">美国 · 洛杉矶</option>
+    <option value="Australia/Sydney">澳大利亚 · 悉尼</option>
+    <option value="UTC">UTC</option>
+  </datalist>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import {
+    getDatabase, ref, set, get, update, remove, onValue, push,
+    runTransaction, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+
+  const firebaseConfig={
+    apiKey:"AIzaSyBIbMEYAevOUtxBsUW_1v0b-Z9TMwfUQQ0",
+    authDomain:"no-chinese-game.firebaseapp.com",
+    projectId:"no-chinese-game",
+    storageBucket:"no-chinese-game.firebasestorage.app",
+    messagingSenderId:"610555847309",
+    appId:"1:610555847309:web:b92ae63c8a9e259ea338c4",
+    databaseURL:"https://no-chinese-game-default-rtdb.asia-southeast1.firebasedatabase.app"
+  };
+
+  const app=initializeApp(firebaseConfig);
+  const auth=getAuth(app);
+  const db=getDatabase(app);
+  const $=id=>document.getElementById(id);
+  const show=el=>el.classList.remove("hidden");
+  const hide=el=>el.classList.add("hidden");
+  const defaultZone=Intl.DateTimeFormat().resolvedOptions().timeZone||"Asia/Shanghai";
+  const PLAN_TTL_MS=179*24*60*60*1000;
+  let uid=null;
+  let currentCode=null;
+  let currentPlan=null;
+  let mySlot=null;
+  let editingWindowId=null;
+  let unsubPlan=null;
+  let previousOverlapSignature=null;
+  let invalidConfirmedCleanup=false;
+  let toastTimer=null;
+
+  function setStatus(el,text,kind=""){
+    el.textContent=text;
+    el.className="status"+(kind?" "+kind:"");
+  }
+
+  function cleanName(value){
+    const name=String(value||"").trim().slice(0,24);
+    if(!name) throw new Error("请先填写名字。");
+    localStorage.setItem("nc_name",name);
+    return name;
+  }
+
+  function cleanCode(value){
+    return String(value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,8);
+  }
+
+  function makeCode(){
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code="";
+    for(let i=0;i<8;i++) code+=chars[Math.floor(Math.random()*chars.length)];
+    return code;
+  }
+
+  function validZone(zone){
+    try{
+      new Intl.DateTimeFormat("zh-CN",{timeZone:zone}).format();
+      return true;
+    }catch{return false;}
+  }
+
+  function requireZone(input){
+    const zone=String(input.value||"").trim();
+    if(!validZone(zone)) throw new Error("请输入有效时区，例如 Asia/Shanghai、Asia/Tokyo 或 Europe/London。");
+    return zone;
+  }
+
+  function zoneLabel(zone){
+    try{
+      const now=new Intl.DateTimeFormat("zh-CN",{
+        timeZone:zone,month:"long",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23",timeZoneName:"short"
+      }).format(new Date());
+      return `<strong>${zone}</strong>你在这个时区的当前时间：${now}`;
+    }catch{return "请输入有效的 IANA 时区名称。";}
+  }
+
+  function paintZonePreview(input,output){
+    output.innerHTML=zoneLabel(String(input.value||"").trim());
+  }
+
+  function wallParts(timestamp,zone){
+    const parts=new Intl.DateTimeFormat("en-CA",{
+      timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
+    }).formatToParts(new Date(timestamp));
+    const out={};
+    for(const part of parts) if(part.type!=="literal") out[part.type]=Number(part.value);
+    return out;
+  }
+
+  function zoneOffset(timestamp,zone){
+    const p=wallParts(timestamp,zone);
+    return Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-timestamp;
+  }
+
+  function localInputToUtc(value,zone){
+    const match=String(value||"").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+    if(!match) throw new Error("请填写完整的日期和时间。");
+    const [,y,m,d,h,min]=match.map(Number);
+    if(min%30!==0) throw new Error("请选择整点或半点，例如 20:00 或 20:30。");
+    const desired=Date.UTC(y,m-1,d,h,min,0);
+    let guess=desired;
+    for(let i=0;i<4;i++) guess=desired-zoneOffset(guess,zone);
+    const actual=wallParts(guess,zone);
+    if(actual.year!==y||actual.month!==m||actual.day!==d||actual.hour!==h||actual.minute!==min){
+      throw new Error("这个当地时间可能正好落在夏令时跳转区间，请换一个时间。");
+    }
+    return guess;
+  }
+
+  function utcToLocalInput(timestamp,zone){
+    const p=wallParts(timestamp,zone);
+    const pad=n=>String(n).padStart(2,"0");
+    return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
+  }
+
+  function formatInstant(timestamp,zone){
+    return new Intl.DateTimeFormat("zh-CN",{
+      timeZone:zone,month:"long",day:"numeric",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23",timeZoneName:"short"
+    }).format(new Date(timestamp));
+  }
+
+  function formatRange(start,end,zone){
+    return `${formatInstant(start,zone)} — ${formatInstant(end,zone)}`;
+  }
+
+  function entriesFor(slot){
+    return Object.entries(currentPlan?.availability?.[slot]||{})
+      .map(([id,value])=>({id,start:Number(value.startUtc),end:Number(value.endUtc)}))
+      .filter(item=>Number.isFinite(item.start)&&Number.isFinite(item.end)&&item.end>item.start)
+      .sort((a,b)=>a.start-b.start);
+  }
+
+  function overlaps(){
+    const found=[];
+    for(const a of entriesFor("A")){
+      for(const b of entriesFor("B")){
+        const start=Math.max(a.start,b.start);
+        const end=Math.min(a.end,b.end);
+        if(end>start) found.push({start,end});
+      }
+    }
+    found.sort((a,b)=>a.start-b.start);
+    const merged=[];
+    for(const item of found){
+      const last=merged.at(-1);
+      if(last&&item.start<=last.end) last.end=Math.max(last.end,item.end);
+      else merged.push({...item});
+    }
+    return merged;
+  }
+
+  function myZone(){
+    return currentPlan?.[mySlot==="A"?"creatorTimeZone":"participantTimeZone"]||defaultZone;
+  }
+
+  function otherSlot(){return mySlot==="A"?"B":"A";}
+
+  function zoneForSlot(slot){
+    return currentPlan?.[slot==="A"?"creatorTimeZone":"participantTimeZone"]||null;
+  }
+
+  function nameForSlot(slot){
+    return currentPlan?.[slot==="A"?"creatorName":"participantName"]||(slot==="A"?"发起者":"朋友");
+  }
+
+  function toast(message){
+    $("toast").textContent=message;
+    show($("toast"));
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>hide($("toast")),4200);
+  }
+
+  async function createPlan(){
+    const name=cleanName($("creatorName").value);
+    const title=String($("planTitle").value||"").trim().slice(0,60);
+    if(!title) throw new Error("请填写这次要约什么。");
+    const zone=requireZone($("creatorZone"));
+    $("createPlanBtn").disabled=true;
+    try{
+      let code=null;
+      for(let i=0;i<8;i++){
+        const candidate=makeCode();
+        if(!(await get(ref(db,`appointments/${candidate}/creatorUid`))).exists()){code=candidate;break;}
+      }
+      if(!code) throw new Error("没能生成预约码，请再试一次。");
+      await set(ref(db,`appointments/${code}`),{
+        creatorUid:uid,creatorName:name,creatorTimeZone:zone,title,
+        status:"collecting",createdAt:serverTimestamp(),expiresAt:Date.now()+PLAN_TTL_MS
+      });
+      history.replaceState(null,"",`schedule.html?plan=${code}`);
+      await openPlan(code);
+    }finally{$("createPlanBtn").disabled=false;}
+  }
+
+  async function joinPlan(){
+    const name=cleanName($("participantName").value);
+    const zone=requireZone($("participantZone"));
+    $("joinPlanBtn").disabled=true;
+    let claimedSeat=false;
+    try{
+      const result=await runTransaction(ref(db,`appointments/${currentCode}/participantUid`),value=>value||uid);
+      if(!result.committed||result.snapshot.val()!==uid) throw new Error("另一位朋友刚刚先加入了这张预约表。");
+      claimedSeat=true;
+      await update(ref(db,`appointments/${currentCode}`),{
+        participantName:name,participantTimeZone:zone,updatedAt:serverTimestamp()
+      });
+      await openPlan(currentCode);
+    }catch(error){
+      if(claimedSeat){try{await remove(ref(db,`appointments/${currentCode}/participantUid`));}catch{}}
+      throw error;
+    }finally{$("joinPlanBtn").disabled=false;}
+  }
+
+  async function saveZone(){
+    const zone=requireZone($("myZone"));
+    const field=mySlot==="A"?"creatorTimeZone":"participantTimeZone";
+    await update(ref(db,`appointments/${currentCode}`),{[field]:zone,updatedAt:serverTimestamp()});
+    toast("时区已更新，所有时间已重新换算 ✓");
+  }
+
+  async function saveAvailability(){
+    const zone=myZone();
+    const start=localInputToUtc($("availableStart").value,zone);
+    const end=localInputToUtc($("availableEnd").value,zone);
+    if(end<=start) throw new Error("结束时间必须晚于开始时间。");
+    if(end-start>24*60*60*1000) throw new Error("一段可用时间最长为 24 小时，可以拆成几段填写。");
+    const wasEditing=!!editingWindowId;
+    const id=editingWindowId||push(ref(db,`appointments/${currentCode}/availability/${mySlot}`)).key;
+    await set(ref(db,`appointments/${currentCode}/availability/${mySlot}/${id}`),{startUtc:start,endUtc:end});
+    await update(ref(db,`appointments/${currentCode}`),{updatedAt:serverTimestamp()});
+    resetTimeForm();
+    toast(wasEditing?"可用时间已修改 ✓":"可用时间已保存 ✓");
+  }
+
+  function resetTimeForm(){
+    editingWindowId=null;
+    $("availableStart").value="";
+    $("availableEnd").value="";
+    $("saveTimeBtn").textContent="确认这段时间我可以";
+    hide($("cancelEditBtn"));
+    paintTimeFormHint();
+  }
+
+  function editAvailability(item){
+    editingWindowId=item.id;
+    $("availableStart").value=utcToLocalInput(item.start,myZone());
+    $("availableEnd").value=utcToLocalInput(item.end,myZone());
+    $("saveTimeBtn").textContent="保存修改";
+    show($("cancelEditBtn"));
+    paintTimeFormHint();
+    $("availableStart").scrollIntoView({behavior:"smooth",block:"center"});
+  }
+
+  async function deleteAvailability(id){
+    if(!confirm("删除这段可用时间吗？")) return;
+    await remove(ref(db,`appointments/${currentCode}/availability/${mySlot}/${id}`));
+    await update(ref(db,`appointments/${currentCode}`),{updatedAt:serverTimestamp()});
+  }
+
+  async function confirmOverlap(start,end){
+    await set(ref(db,`appointments/${currentCode}/confirmed`),{
+      startUtc:start,endUtc:end,by:mySlot,updatedAt:serverTimestamp()
+    });
+    toast("交流会时间已选定，双方页面已同步 ✓");
+  }
+
+  function paintTimeFormHint(){
+    const zone=myZone();
+    const otherZone=zoneForSlot(otherSlot());
+    let message=`你输入的是 ${zone} 当地时间。`;
+    if(otherZone&&$("availableStart").value&&$("availableEnd").value){
+      try{
+        const start=localInputToUtc($("availableStart").value,zone);
+        const end=localInputToUtc($("availableEnd").value,zone);
+        message+=` 同一时段在 ${otherZone} 是：${formatRange(start,end,otherZone)}。`;
+      }catch{message+=` 填写完整后，这里会同时核对 ${otherZone} 的时间。`;}
+    }else if(otherZone){
+      message+=` 填写完整后，这里会同时核对 ${otherZone} 的时间。`;
+    }else{
+      message+=" 朋友加入并确认时区后，这里会显示对方对应的当地时间。";
+    }
+    $("timeFormHint").textContent=message;
+  }
+
+  function timeItem(item,{mine=false,overlap=false}={}){
+    const outer=document.createElement("div");
+    outer.className="timeItem"+(overlap?" overlap":"");
+    const text=document.createElement("div");
+    text.className="timeText";
+    text.innerHTML="<div class=\"timeMain\"></div><div class=\"small viewerZone\"></div><div class=\"small dualTime hidden\"></div>";
+    text.querySelector(".timeMain").textContent=formatRange(item.start,item.end,myZone());
+    text.querySelector(".viewerZone").textContent=`你的显示：${myZone()}`;
+    const counterpartZone=zoneForSlot(otherSlot());
+    if(counterpartZone){
+      const dual=text.querySelector(".dualTime");
+      dual.textContent=`${nameForSlot(otherSlot())}当地：${formatRange(item.start,item.end,counterpartZone)} · ${counterpartZone}`;
+      dual.classList.remove("hidden");
+    }
+    outer.append(text);
+    const actions=document.createElement("div");
+    actions.className="timeActions";
+    if(mine){
+      const edit=document.createElement("button");edit.className="mini secondary";edit.textContent="修改";edit.onclick=()=>editAvailability(item);
+      const del=document.createElement("button");del.className="mini danger";del.textContent="删除";del.onclick=()=>deleteAvailability(item.id);
+      actions.append(edit,del);
+    }
+    if(overlap){
+      const confirmButton=document.createElement("button");confirmButton.className="mini primary";confirmButton.textContent="选定这个时间";
+      confirmButton.onclick=()=>confirmOverlap(item.start,item.end);
+      actions.append(confirmButton);
+    }
+    if(actions.childElementCount) outer.append(actions);
+    return outer;
+  }
+
+  function paintList(container,items,options={}){
+    container.innerHTML="";
+    if(!items.length){container.innerHTML=`<div class="empty">${options.empty||"还没有填写时间"}</div>`;return;}
+    for(const item of items) container.append(timeItem(item,options));
+  }
+
+  function confirmedStillValid(available){
+    const confirmed=currentPlan?.confirmed;
+    if(!confirmed) return true;
+    return available.some(item=>Number(confirmed.startUtc)>=item.start&&Number(confirmed.endUtc)<=item.end);
+  }
+
+  function renderPlan(){
+    if(!currentPlan||!mySlot) return;
+    hide($("landingPanel"));hide($("joinPanel"));hide($("fullPanel"));show($("planPanel"));
+    $("detailTitle").textContent=currentPlan.title||"不讲中文交流会";
+    $("planCode").textContent=currentCode;
+    $("personAName").textContent=currentPlan.creatorName||"发起者";
+    $("personAZone").textContent=currentPlan.creatorTimeZone||"—";
+    $("personBName").textContent=currentPlan.participantName||"等待加入…";
+    $("personBZone").textContent=currentPlan.participantTimeZone||"—";
+    $("personA").classList.toggle("me",mySlot==="A");
+    $("personB").classList.toggle("me",mySlot==="B");
+    $("myZone").value=myZone();
+    paintZonePreview($("myZone"),$("myZonePreview"));
+    paintTimeFormHint();
+    $("deletePlanBtn").classList.toggle("hidden",mySlot!=="A");
+
+    if(currentPlan.participantUid){
+      setStatus($("planStatus"),"✅ 双方都已加入。修改会实时同步。","good");
+    }else{
+      setStatus($("planStatus"),"预约表已创建，等待朋友打开邀请链接。","");
+    }
+
+    paintList($("myTimeList"),entriesFor(mySlot),{mine:true,empty:"你还没有确认可用时间。"});
+    const other=entriesFor(otherSlot());
+    $("otherTimesTitle").textContent=currentPlan[otherSlot()==="A"?"creatorName":"participantName"]
+      ?`${currentPlan[otherSlot()==="A"?"creatorName":"participantName"]}什么时候方便？`:"等待朋友填写";
+    paintList($("otherTimeList"),other,{empty:currentPlan.participantUid?"对方还没有确认可用时间。":"朋友加入后，会在这里显示对方的可用时间。"});
+
+    const common=overlaps();
+    if(common.length){
+      show($("overlapPanel"));
+      paintList($("overlapList"),common,{overlap:true});
+    }else{
+      hide($("overlapPanel"));
+    }
+    const signature=common.map(item=>`${item.start}-${item.end}`).join("|");
+    if(previousOverlapSignature!==null&&signature&&signature!==previousOverlapSignature){
+      toast("🎉 找到新的重叠时间！双方页面已同步。");
+    }
+    previousOverlapSignature=signature;
+
+    if(currentPlan.confirmed&&confirmedStillValid(common)){
+      show($("confirmedPanel"));
+      $("confirmedTime").textContent=formatRange(Number(currentPlan.confirmed.startUtc),Number(currentPlan.confirmed.endUtc),myZone());
+      const counterpartZone=zoneForSlot(otherSlot());
+      if(counterpartZone){
+        $("confirmedOtherTime").textContent=`${nameForSlot(otherSlot())}当地：${formatRange(Number(currentPlan.confirmed.startUtc),Number(currentPlan.confirmed.endUtc),counterpartZone)} · ${counterpartZone}`;
+        show($("confirmedOtherTime"));
+      }else{
+        hide($("confirmedOtherTime"));
+      }
+      const byName=currentPlan.confirmed.by==="A"?currentPlan.creatorName:currentPlan.participantName;
+      $("confirmedMeta").textContent=`你的当地时间 · ${myZone()} · 由 ${byName||"其中一位参与者"} 选定`;
+    }else{
+      hide($("confirmedPanel"));
+      if(currentPlan.confirmed&&!invalidConfirmedCleanup){
+        invalidConfirmedCleanup=true;
+        toast("原来选定的时间已经不再重叠，请重新选择。");
+        remove(ref(db,`appointments/${currentCode}/confirmed`)).finally(()=>invalidConfirmedCleanup=false);
+      }
+    }
+  }
+
+  async function openPlan(code){
+    code=cleanCode(code);
+    if(code.length!==8) throw new Error("请输入完整的 8 位预约码。");
+    if(code!==currentCode) previousOverlapSignature=null;
+    currentCode=code;
+    const snap=await get(ref(db,`appointments/${code}`));
+    if(!snap.exists()) throw new Error("没有找到这张预约表，它可能已经删除或过期。");
+    currentPlan=snap.val();
+    if(Number(currentPlan.expiresAt)<=Date.now()){
+      try{await remove(ref(db,`appointments/${code}`));}catch{}
+      throw new Error("这张预约表已经过期。");
+    }
+    if(currentPlan.creatorUid===uid) mySlot="A";
+    else if(currentPlan.participantUid===uid) mySlot="B";
+    else if(!currentPlan.participantUid){
+      hide($("landingPanel"));hide($("planPanel"));hide($("fullPanel"));show($("joinPanel"));
+      $("joinTitle").textContent=currentPlan.title||"不讲中文交流会";
+      $("joinCreator").textContent=`由 ${currentPlan.creatorName||"朋友"} 发起。加入后，你们各自填写方便的时间。`;
+      return;
+    }else{
+      hide($("landingPanel"));hide($("planPanel"));hide($("joinPanel"));show($("fullPanel"));
+      return;
+    }
+    if(unsubPlan) unsubPlan();
+    unsubPlan=onValue(ref(db,`appointments/${code}`),snapshot=>{
+      if(!snapshot.exists()){
+        if(unsubPlan) unsubPlan();
+        alert("这张预约表已经被删除。");location.href="schedule.html";return;
+      }
+      currentPlan=snapshot.val();
+      if(currentPlan.creatorUid===uid) mySlot="A";
+      else if(currentPlan.participantUid===uid) mySlot="B";
+      renderPlan();
+    },error=>setStatus($("planStatus"),"读取预约失败："+error.message,"bad"));
+  }
+
+  function downloadCalendar(){
+    const confirmed=currentPlan?.confirmed;
+    if(!confirmed) return;
+    const stamp=timestamp=>new Date(Number(timestamp)).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+    const escape=value=>String(value||"").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n");
+    const content=[
+      "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//No Chinese Game//Schedule//ZH","CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT",`UID:${currentCode}@no-chinese-game`,`DTSTAMP:${stamp(Date.now())}`,
+      `DTSTART:${stamp(confirmed.startUtc)}`,`DTEND:${stamp(confirmed.endUtc)}`,
+      `SUMMARY:${escape(currentPlan.title||"不讲中文交流会")}`,
+      `DESCRIPTION:${escape("预约码："+currentCode+"\\n到时间打开交流会网页。")}`,
+      "END:VEVENT","END:VCALENDAR"
+    ].join("\r\n");
+    const blob=new Blob([content],{type:"text/calendar;charset=utf-8"});
+    const link=document.createElement("a");
+    link.href=URL.createObjectURL(blob);link.download=`${currentPlan.title||"交流会"}.ics`;link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+  }
+
+  async function copyText(text,button,label){
+    try{
+      await navigator.clipboard.writeText(text);button.textContent="已复制 ✓";
+      setTimeout(()=>button.textContent=label,1400);
+    }catch{prompt("复制：",text);}
+  }
+
+  async function deletePlan(){
+    if(mySlot!=="A"||!confirm("确定删除整张预约表吗？双方填写的时间都会删除。")) return;
+    await remove(ref(db,`appointments/${currentCode}`));
+  }
+
+  function run(action,label){
+    Promise.resolve().then(action).catch(error=>{alert(`${label}：\n${error.message||error}`);console.error(error);});
+  }
+
+  $("creatorName").value=localStorage.getItem("nc_name")||"";
+  $("participantName").value=localStorage.getItem("nc_name")||"";
+  $("creatorZone").value=defaultZone;
+  $("participantZone").value=defaultZone;
+  paintZonePreview($("creatorZone"),$("creatorZonePreview"));
+  paintZonePreview($("participantZone"),$("participantZonePreview"));
+  $("creatorZone").addEventListener("input",()=>paintZonePreview($("creatorZone"),$("creatorZonePreview")));
+  $("participantZone").addEventListener("input",()=>paintZonePreview($("participantZone"),$("participantZonePreview")));
+  $("myZone").addEventListener("input",()=>paintZonePreview($("myZone"),$("myZonePreview")));
+  $("availableStart").addEventListener("input",paintTimeFormHint);
+  $("availableEnd").addEventListener("input",paintTimeFormHint);
+  $("planCodeInput").addEventListener("input",event=>event.target.value=cleanCode(event.target.value));
+  $("createPlanBtn").addEventListener("click",()=>run(createPlan,"创建预约表失败"));
+  $("openPlanBtn").addEventListener("click",()=>run(async()=>{
+    const code=cleanCode($("planCodeInput").value);history.replaceState(null,"",`schedule.html?plan=${code}`);await openPlan(code);
+  },"打开预约表失败"));
+  $("joinPlanBtn").addEventListener("click",()=>run(joinPlan,"加入预约表失败"));
+  $("saveZoneBtn").addEventListener("click",()=>run(saveZone,"更新时区失败"));
+  $("saveTimeBtn").addEventListener("click",()=>run(saveAvailability,"保存时间失败"));
+  $("cancelEditBtn").addEventListener("click",resetTimeForm);
+  $("copyPlanCodeBtn").addEventListener("click",()=>copyText(currentCode,$("copyPlanCodeBtn"),"复制预约码"));
+  $("copyPlanLinkBtn").addEventListener("click",()=>copyText(location.href,$("copyPlanLinkBtn"),"复制邀请链接"));
+  $("calendarBtn").addEventListener("click",downloadCalendar);
+  $("deletePlanBtn").addEventListener("click",()=>run(deletePlan,"删除预约表失败"));
+
+  onAuthStateChanged(auth,async user=>{
+    if(!user) return;
+    uid=user.uid;hide($("bootPanel"));
+    const code=cleanCode(new URL(location.href).searchParams.get("plan"));
+    if(code.length===8){
+      try{await openPlan(code);}catch(error){alert(error.message||error);history.replaceState(null,"","schedule.html");show($("landingPanel"));}
+    }else show($("landingPanel"));
+  });
+
+  signInAnonymously(auth).catch(error=>setStatus($("bootStatus"),"匿名连接失败："+error.message,"bad"));
+</script>
+</body>
+</html>
