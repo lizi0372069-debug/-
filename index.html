@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>No Chinese! Multiplayer Test</title>
+  <title>不讲中文交流会</title>
   <style>
     :root{
       --bg:#f6f3ed;--panel:#fffdf8;--text:#222;--muted:#706b63;--line:#ddd6ca;
@@ -46,10 +46,12 @@
     .roomCode{font-size:34px;font-weight:900;letter-spacing:.12em;text-align:center;margin:10px 0}
     .players{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .player{
-      border:1px solid var(--line);border-radius:16px;padding:14px;background:white;min-height:130px;
+      border:1px solid var(--line);border-radius:16px;padding:14px;background:white;min-height:150px;
     }
     .slot{font-size:12px;color:var(--muted);font-weight:800}
     .name{font-size:20px;font-weight:900;margin:7px 0}
+    .presence{font-size:13px;font-weight:800;margin:0 0 7px;color:var(--muted)}
+    .presence.online{color:#277742}
     .tickets{font-size:28px;font-weight:900}
     .me{outline:2px solid #222}
     .small{font-size:12px;color:var(--muted);line-height:1.55}
@@ -57,13 +59,14 @@
       margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:16px;
       background:#faf8f3;text-align:center;
     }
+    .recovery{border:1px solid var(--line);border-radius:16px;padding:14px;background:#faf8f3;margin:14px 0}
     @media(max-width:520px){.players{grid-template-columns:1fr}.row{flex-direction:column}}
   </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>No Chinese! 🎴</h1>
-  <div class="sub">v0.3.1 联机测试 · 房间大厅 + 双人实时同步</div>
+  <h1>不讲中文交流会 🎴</h1>
+  <div class="sub">v0.3.2 联机测试 · 在线状态 + 房间生命周期</div>
 
   <div id="bootPanel" class="panel">
     <div id="bootStatus" class="status">正在连接 Firebase，并创建匿名身份…</div>
@@ -71,6 +74,15 @@
 
   <div id="homePanel" class="panel hidden">
     <div class="status good">✅ Firebase 已连接。你不需要注册账号。</div>
+
+    <div id="recoveryBox" class="recovery hidden">
+      <div id="recoveryText"><strong>检测到上次房间</strong></div>
+      <div class="row">
+        <button id="restoreBtn" class="primary">恢复房间</button>
+        <button id="forgetBtn" class="secondary">放弃本机记录</button>
+      </div>
+      <div class="small" style="margin-top:9px">网页不会再自动进入旧房间，由你决定是否恢复。</div>
+    </div>
 
     <label>你的显示名字</label>
     <input id="nameInput" maxlength="24" placeholder="例如 Lii" />
@@ -96,7 +108,9 @@
       <button id="copyBtn" class="secondary">复制邀请链接</button>
     </div>
     <div class="row">
-      <button id="leaveBtn" class="secondary">回到首页</button>
+      <button id="homeBtn" class="secondary">回到首页</button>
+      <button id="leaveRoomBtn" class="danger hidden">离开房间</button>
+      <button id="endRoomBtn" class="danger hidden">结束房间</button>
     </div>
 
     <div style="height:14px"></div>
@@ -104,24 +118,26 @@
       <div id="playerA" class="player">
         <div class="slot">PLAYER A</div>
         <div id="nameA" class="name">等待中…</div>
+        <div id="onlineA" class="presence">⚪ 离线</div>
         <div id="ticketsA" class="tickets">🎫 —</div>
         <button id="useTicketA" class="danger hidden" style="width:100%;margin-top:10px">使用我的 1 张券</button>
       </div>
       <div id="playerB" class="player">
         <div class="slot">PLAYER B</div>
         <div id="nameB" class="name">等待加入…</div>
+        <div id="onlineB" class="presence">⚪ 离线</div>
         <div id="ticketsB" class="tickets">🎫 —</div>
         <button id="useTicketB" class="danger hidden" style="width:100%;margin-top:10px">使用我的 1 张券</button>
       </div>
     </div>
 
     <div id="startBox" class="startBox">
-      <div id="startText" class="small">等待另一位玩家加入后开始。</div>
+      <div id="startText" class="small">等待另一位玩家在线后开始。</div>
       <button id="startBtn" class="primary hidden" style="width:100%;margin-top:10px">开始游戏</button>
     </div>
 
     <div class="small" style="margin-top:14px">
-      大厅阶段不允许使用中文券。A 与 B 都进入后，由 Player A 开始游戏；进入 playing 状态以后才能扣券。
+      只有 A、B 都在线时才能开始。回到首页只会暂时离线并保留座位；Player B 可主动释放座位，Player A 可立即结束整间房。双方离线约 3 小时后，房间会自动失效并在下次访问时清理。
     </div>
   </div>
 </div>
@@ -129,7 +145,10 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
-  import { getDatabase, ref, set, get, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+  import {
+    getDatabase, ref, set, get, update, remove, onValue, runTransaction,
+    onDisconnect, serverTimestamp, push
+  } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBIbMEYAevOUtxBsUW_1v0b-Z9TMwfUQQ0",
@@ -141,6 +160,8 @@
     databaseURL: "https://no-chinese-game-default-rtdb.asia-southeast1.firebasedatabase.app"
   };
 
+  const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
+  const HEARTBEAT_MS = 60 * 1000;
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getDatabase(app);
@@ -150,12 +171,23 @@
   let currentRoom = null;
   let mySlot = null;
   let roomPlayers = {};
+  let roomPresence = {};
   let gameStatus = "lobby";
+  let dbConnected = false;
+  let serverTimeOffset = 0;
   let unsubPlayers = null;
+  let unsubPresence = null;
   let unsubStatus = null;
+  let presenceConnectionId = null;
+  let presenceDisconnect = null;
+  let presenceStarting = false;
+  let presenceGeneration = 0;
+  let heartbeatTimer = null;
+  let recoveryTimer = null;
 
   const show = el => el.classList.remove("hidden");
   const hide = el => el.classList.add("hidden");
+  const serverNow = () => Date.now() + serverTimeOffset;
 
   function setStatus(el,text,kind=""){
     el.textContent=text;
@@ -165,11 +197,12 @@
   function cleanName(){
     const n=$("nameInput").value.trim();
     if(!n) throw new Error("请先输入你的名字。");
+    localStorage.setItem("nc_name",n.slice(0,24));
     return n.slice(0,24);
   }
 
   function cleanRoomCode(raw){
-    return raw.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
+    return String(raw||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
   }
 
   function makeRoomCode(){
@@ -177,11 +210,6 @@
     let out="";
     for(let i=0;i<6;i++) out+=chars[Math.floor(Math.random()*chars.length)];
     return out;
-  }
-
-  async function roomAppearsUnused(code){
-    const snap=await get(ref(db,`rooms/${code}/meta/open`));
-    return !snap.exists();
   }
 
   function saveSession(code,slot){
@@ -192,6 +220,32 @@
   function clearSession(){
     localStorage.removeItem("nc_room");
     localStorage.removeItem("nc_slot");
+    if(recoveryTimer) clearTimeout(recoveryTimer);
+    recoveryTimer=null;
+    hide($("recoveryBox"));
+  }
+
+  async function getRoomMeta(code){
+    const snap=await get(ref(db,`rooms/${code}/meta`));
+    return snap.exists()?snap.val():null;
+  }
+
+  function isExpired(meta){
+    return !!(meta && typeof meta.expiresAt==="number" && meta.expiresAt<=serverNow());
+  }
+
+  async function cleanupExpiredRoom(code,meta=null){
+    const actualMeta=meta||await getRoomMeta(code);
+    if(!isExpired(actualMeta)) return false;
+    try{await remove(ref(db,`rooms/${code}`));}catch(err){console.warn("过期房间清理失败",err);}
+    return true;
+  }
+
+  async function roomAppearsUnused(code){
+    const meta=await getRoomMeta(code);
+    if(!meta) return true;
+    if(await cleanupExpiredRoom(code,meta)) return true;
+    return false;
   }
 
   async function createRoom(){
@@ -209,10 +263,14 @@
       await set(ref(db,`rooms/${code}/players/A/name`),name);
       await set(ref(db,`rooms/${code}/players/A/tickets`),5);
       await set(ref(db,`rooms/${code}/meta/open`),true);
+      await update(ref(db,`rooms/${code}/meta`),{
+        lastActiveAt:serverTimestamp(),
+        expiresAt:serverNow()+ROOM_TTL_MS
+      });
       await set(ref(db,`rooms/${code}/state/status`),"lobby");
       await set(ref(db,`rooms/${code}/state/turn`),"A");
 
-      enterRoom(code,"A");
+      await enterRoom(code,"A");
     }catch(err){
       alert("创建房间失败：\n"+(err.message||err));
       console.error(err);
@@ -228,18 +286,18 @@
 
     $("joinBtn").disabled=true;
     try{
-      const openSnap=await get(ref(db,`rooms/${code}/meta/open`));
-      if(!openSnap.exists()||openSnap.val()!==true) throw new Error("没有找到这个开放房间。");
+      const meta=await getRoomMeta(code);
+      if(!meta||meta.open!==true) throw new Error("没有找到这个开放房间。");
+      if(await cleanupExpiredRoom(code,meta)) throw new Error("这个房间已超过 3 小时无人在线，已经关闭。");
 
       await set(ref(db,`rooms/${code}/players/B/uid`),uid);
       await set(ref(db,`rooms/${code}/players/B/name`),name);
       await set(ref(db,`rooms/${code}/players/B/tickets`),5);
-
-      enterRoom(code,"B");
+      await enterRoom(code,"B");
     }catch(err){
       const msg=String(err.message||err);
       if(msg.toLowerCase().includes("permission")){
-        alert("加入失败：这个房间可能已经有两个人了，或权限规则拒绝了加入。");
+        alert("加入失败：这个房间可能已经有两个人了、已经过期，或权限规则拒绝了加入。");
       }else{
         alert("加入房间失败：\n"+msg);
       }
@@ -249,28 +307,47 @@
     }
   }
 
+  function slotIsOnline(slot){
+    return !!(roomPresence[slot] && Object.keys(roomPresence[slot]).length);
+  }
+
+  function paintPresence(slot,online){
+    const el=$("online"+slot);
+    el.textContent=online?"🟢 在线":"⚪ 离线";
+    el.classList.toggle("online",online);
+  }
+
   function refreshLobbyUI(){
-    const both=!!(roomPlayers.A?.uid && roomPlayers.B?.uid);
+    const seated=!!(roomPlayers.A?.uid && roomPlayers.B?.uid);
+    const onlineA=slotIsOnline("A");
+    const onlineB=slotIsOnline("B");
+    const bothOnline=seated&&onlineA&&onlineB;
     const playing=gameStatus==="playing";
 
+    paintPresence("A",onlineA);
+    paintPresence("B",onlineB);
     $("useTicketA").classList.toggle("hidden", !(playing && mySlot==="A"));
     $("useTicketB").classList.toggle("hidden", !(playing && mySlot==="B"));
 
     if(playing){
-      $("startText").textContent="🎮 游戏已开始。现在可以使用自己的中文券。";
+      $("startText").textContent=bothOnline?"🎮 游戏进行中。双方都在线。":"🎮 游戏进行中，正在等待另一位玩家回来…";
       hide($("startBtn"));
-      setStatus($("roomStatus"),"✅ 游戏进行中。双方状态实时同步。","good");
-    }else if(both){
+      setStatus($("roomStatus"),bothOnline?"✅ 游戏进行中。双方状态实时同步。":"游戏仍在进行，但有玩家目前离线。",bothOnline?"good":"");
+    }else if(bothOnline){
       if(mySlot==="A"){
-        $("startText").textContent="两位玩家都到了。由你开始游戏。";
+        $("startText").textContent="两位玩家都在线了。由你开始游戏。";
         show($("startBtn"));
       }else{
-        $("startText").textContent="两位玩家都到了，等待 Player A 开始游戏…";
+        $("startText").textContent="两位玩家都在线了，等待 Player A 开始游戏…";
         hide($("startBtn"));
       }
-      setStatus($("roomStatus"),"✅ 两位玩家都已连接。","good");
+      setStatus($("roomStatus"),"✅ 两位玩家都在线。","good");
+    }else if(seated){
+      $("startText").textContent="座位已保留，等待两位玩家都上线后开始。";
+      hide($("startBtn"));
+      setStatus($("roomStatus"),"另一位玩家有座位，但目前不在线。","");
     }else{
-      $("startText").textContent=mySlot==="A"?"等待 Player B 加入后开始。":"等待房间准备完成…";
+      $("startText").textContent=mySlot==="A"?"等待 Player B 加入并上线后开始。":"等待房间准备完成…";
       hide($("startBtn"));
       setStatus($("roomStatus"),mySlot==="A"?"房间已创建，等待 Player B 加入…":"已加入房间，正在同步…","good");
     }
@@ -280,23 +357,115 @@
     if(btn) btn.disabled=!(playing && mine && typeof mine.tickets==="number" && mine.tickets>0);
   }
 
-  function enterRoom(code,slot){
+  async function touchRoomActivity(code=currentRoom){
+    if(!code||!uid) return;
+    await update(ref(db,`rooms/${code}/meta`),{
+      lastActiveAt:serverTimestamp(),
+      expiresAt:serverNow()+ROOM_TTL_MS
+    });
+  }
+
+  async function startPresence(){
+    if(!dbConnected||!currentRoom||!mySlot||presenceStarting||presenceConnectionId) return;
+    const generation=presenceGeneration;
+    const code=currentRoom;
+    const slot=mySlot;
+    presenceStarting=true;
+    try{
+      const connectionId=push(ref(db,`rooms/${code}/presence/${slot}`)).key;
+      const disconnect=onDisconnect(ref(db,`rooms/${code}`));
+      await disconnect.update({
+        [`presence/${slot}/${connectionId}`]:null,
+        "meta/lastActiveAt":serverTimestamp(),
+        "meta/expiresAt":serverNow()+ROOM_TTL_MS
+      });
+      if(generation!==presenceGeneration||code!==currentRoom){
+        await disconnect.cancel();
+        return;
+      }
+      await set(ref(db,`rooms/${code}/presence/${slot}/${connectionId}`),true);
+      presenceConnectionId=connectionId;
+      presenceDisconnect=disconnect;
+      await touchRoomActivity(code);
+    }catch(err){
+      setStatus($("roomStatus"),"在线状态连接失败："+(err.message||err),"bad");
+      console.error(err);
+    }finally{
+      presenceStarting=false;
+    }
+  }
+
+  async function stopPresence(){
+    presenceGeneration++;
+    const code=currentRoom;
+    const slot=mySlot;
+    const connectionId=presenceConnectionId;
+    const disconnect=presenceDisconnect;
+    presenceConnectionId=null;
+    presenceDisconnect=null;
+    presenceStarting=false;
+    if(disconnect){
+      try{await disconnect.cancel();}catch{}
+    }
+    if(code&&slot&&connectionId&&dbConnected){
+      try{await remove(ref(db,`rooms/${code}/presence/${slot}/${connectionId}`));}catch{}
+      try{await touchRoomActivity(code);}catch{}
+    }
+  }
+
+  async function refreshDisconnectPlan(){
+    if(!presenceDisconnect||!presenceConnectionId||!currentRoom||!mySlot) return;
+    await presenceDisconnect.update({
+      [`presence/${mySlot}/${presenceConnectionId}`]:null,
+      "meta/lastActiveAt":serverTimestamp(),
+      "meta/expiresAt":serverNow()+ROOM_TTL_MS
+    });
+  }
+
+  function startHeartbeat(){
+    if(heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer=setInterval(()=>{
+      if(dbConnected&&currentRoom){
+        touchRoomActivity().catch(console.warn);
+        refreshDisconnectPlan().catch(console.warn);
+      }
+    },HEARTBEAT_MS);
+  }
+
+  function stopHeartbeat(){
+    if(heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer=null;
+  }
+
+  function teardownRoomListeners(){
+    if(unsubPlayers) unsubPlayers();
+    if(unsubPresence) unsubPresence();
+    if(unsubStatus) unsubStatus();
+    unsubPlayers=null;unsubPresence=null;unsubStatus=null;
+  }
+
+  async function enterRoom(code,slot){
+    const meta=await getRoomMeta(code);
+    if(!meta||await cleanupExpiredRoom(code,meta)){
+      clearSession();
+      throw new Error("这个房间已经不存在或已过期。");
+    }
+
     currentRoom=code;
     mySlot=slot;
     saveSession(code,slot);
-
     hide($("homePanel"));
     hide($("bootPanel"));
     show($("roomPanel"));
     $("roomCode").textContent=code;
-
     $("playerA").classList.toggle("me",slot==="A");
     $("playerB").classList.toggle("me",slot==="B");
+    $("leaveRoomBtn").classList.toggle("hidden",slot!=="B");
+    $("endRoomBtn").classList.toggle("hidden",slot!=="A");
 
-    if(unsubPlayers) unsubPlayers();
-    if(unsubStatus) unsubStatus();
-
+    teardownRoomListeners();
     unsubPlayers=onValue(ref(db,`rooms/${code}/players`),snap=>{
+      if(!snap.exists()) return handleRoomGone();
       roomPlayers=snap.val()||{};
       $("nameA").textContent=roomPlayers.A?.name||"等待中…";
       $("nameB").textContent=roomPlayers.B?.name||"等待加入…";
@@ -307,7 +476,13 @@
       setStatus($("roomStatus"),"读取房间失败："+err.message,"bad");
       console.error(err);
     });
-
+    unsubPresence=onValue(ref(db,`rooms/${code}/presence`),snap=>{
+      roomPresence=snap.val()||{};
+      refreshLobbyUI();
+    },err=>{
+      setStatus($("roomStatus"),"读取在线状态失败："+err.message,"bad");
+      console.error(err);
+    });
     unsubStatus=onValue(ref(db,`rooms/${code}/state/status`),snap=>{
       gameStatus=snap.val()||"lobby";
       refreshLobbyUI();
@@ -315,13 +490,85 @@
       setStatus($("roomStatus"),"读取游戏状态失败："+err.message,"bad");
       console.error(err);
     });
+
+    startHeartbeat();
+    if(dbConnected) await startPresence();
+  }
+
+  async function goHome({keepSession=true}={}){
+    teardownRoomListeners();
+    stopHeartbeat();
+    await stopPresence();
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    if(!keepSession) clearSession();
+    hide($("roomPanel"));
+    show($("homePanel"));
+    if(keepSession) await offerSavedSession();
+  }
+
+  function handleRoomGone(){
+    const wasInRoom=!!currentRoom;
+    teardownRoomListeners();
+    stopHeartbeat();
+    presenceGeneration++;
+    presenceConnectionId=null;presenceDisconnect=null;
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    clearSession();
+    hide($("roomPanel"));
+    show($("homePanel"));
+    if(wasInRoom) alert("这个房间已经结束或过期了。");
+  }
+
+  async function restoreSavedSession(){
+    const code=cleanRoomCode(localStorage.getItem("nc_room"));
+    const slot=localStorage.getItem("nc_slot");
+    if(code.length!==6||(slot!=="A"&&slot!=="B")) return clearSession();
+    $("restoreBtn").disabled=true;
+    try{
+      const meta=await getRoomMeta(code);
+      if(!meta||await cleanupExpiredRoom(code,meta)) throw new Error("上次的房间已经过期或结束了。");
+      const mine=await get(ref(db,`rooms/${code}/players/${slot}`));
+      if(!mine.exists()||mine.val()?.uid!==uid) throw new Error("这个座位已经不属于当前设备。");
+      if(mine.val()?.name) $("nameInput").value=mine.val().name;
+      await enterRoom(code,slot);
+    }catch(err){
+      clearSession();
+      alert(err.message||err);
+    }finally{
+      $("restoreBtn").disabled=false;
+    }
+  }
+
+  async function offerSavedSession(){
+    if(recoveryTimer) clearTimeout(recoveryTimer);
+    recoveryTimer=null;
+    const code=cleanRoomCode(localStorage.getItem("nc_room"));
+    const slot=localStorage.getItem("nc_slot");
+    if(code.length!==6||(slot!=="A"&&slot!=="B")) return hide($("recoveryBox"));
+    try{
+      const meta=await getRoomMeta(code);
+      if(!meta||await cleanupExpiredRoom(code,meta)) return clearSession();
+      const mine=await get(ref(db,`rooms/${code}/players/${slot}`));
+      if(!mine.exists()||mine.val()?.uid!==uid) return clearSession();
+      if(mine.val()?.name&&!$("nameInput").value) $("nameInput").value=mine.val().name;
+      $("recoveryText").innerHTML=`<strong>检测到上次房间 ${code}</strong><br><span class="small">你的座位：Player ${slot}</span>`;
+      show($("recoveryBox"));
+      if(typeof meta.expiresAt==="number"){
+        const delay=Math.max(1000,meta.expiresAt-serverNow()+1000);
+        recoveryTimer=setTimeout(()=>offerSavedSession(),delay);
+      }
+    }catch{
+      clearSession();
+    }
   }
 
   async function startGame(){
     if(mySlot!=="A"||!currentRoom) return;
     $("startBtn").disabled=true;
     try{
-      if(!(roomPlayers.A?.uid&&roomPlayers.B?.uid)) throw new Error("Player B 还没有加入。");
+      if(!(roomPlayers.A?.uid&&roomPlayers.B?.uid&&slotIsOnline("A")&&slotIsOnline("B"))){
+        throw new Error("必须等 Player A 和 Player B 都在线。 ");
+      }
       await set(ref(db,`rooms/${currentRoom}/meta/open`),false);
       await set(ref(db,`rooms/${currentRoom}/state/status`),"playing");
     }catch(err){
@@ -339,10 +586,45 @@
         if(typeof current!=="number"||current<=0) return;
         return current-1;
       },{applyLocally:false});
+      await touchRoomActivity();
     }catch(err){
       alert("使用券失败："+(err.message||err));
       console.error(err);
     }
+  }
+
+  async function leaveRoom(){
+    if(mySlot!=="B"||!currentRoom) return;
+    if(!confirm("离开后会释放 Player B 座位，之后需要重新加入。确定离开吗？")) return;
+    const code=currentRoom;
+    teardownRoomListeners();
+    stopHeartbeat();
+    await stopPresence();
+    try{await remove(ref(db,`rooms/${code}/players/B`));}catch(err){
+      alert("离开房间失败："+(err.message||err));
+      return;
+    }
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    clearSession();
+    hide($("roomPanel"));
+    show($("homePanel"));
+  }
+
+  async function endRoom(){
+    if(mySlot!=="A"||!currentRoom) return;
+    if(!confirm("确定结束房间吗？整局房间数据会被删除，另一位玩家也会退出。")) return;
+    const code=currentRoom;
+    teardownRoomListeners();
+    stopHeartbeat();
+    await stopPresence();
+    try{await remove(ref(db,`rooms/${code}`));}catch(err){
+      alert("结束房间失败："+(err.message||err));
+      return;
+    }
+    currentRoom=null;mySlot=null;roomPlayers={};roomPresence={};gameStatus="lobby";
+    clearSession();
+    hide($("roomPanel"));
+    show($("homePanel"));
   }
 
   async function copyText(text,button,label){
@@ -357,16 +639,18 @@
 
   $("createBtn").addEventListener("click",createRoom);
   $("joinBtn").addEventListener("click",joinRoom);
+  $("restoreBtn").addEventListener("click",restoreSavedSession);
+  $("forgetBtn").addEventListener("click",clearSession);
   $("startBtn").addEventListener("click",startGame);
   $("useTicketA").addEventListener("click",()=>useMyTicket("A"));
   $("useTicketB").addEventListener("click",()=>useMyTicket("B"));
-
+  $("homeBtn").addEventListener("click",()=>goHome({keepSession:true}));
+  $("leaveRoomBtn").addEventListener("click",leaveRoom);
+  $("endRoomBtn").addEventListener("click",endRoom);
   $("roomInput").addEventListener("input",e=>e.target.value=cleanRoomCode(e.target.value));
-
   $("copyCodeBtn").addEventListener("click",()=>{
     if(currentRoom) copyText(currentRoom,$("copyCodeBtn"),"复制房间码");
   });
-
   $("copyBtn").addEventListener("click",()=>{
     if(!currentRoom) return;
     const u=new URL(location.href);
@@ -374,35 +658,30 @@
     copyText(u.toString(),$("copyBtn"),"复制邀请链接");
   });
 
-  $("leaveBtn").addEventListener("click",()=>{
-    if(unsubPlayers) unsubPlayers();
-    if(unsubStatus) unsubStatus();
-    unsubPlayers=null;unsubStatus=null;
-    currentRoom=null;mySlot=null;roomPlayers={};gameStatus="lobby";
-    clearSession();
-    hide($("roomPanel"));
-    show($("homePanel"));
-  });
-
-  const roomFromUrl=cleanRoomCode(new URL(location.href).searchParams.get("room")||"");
+  const roomFromUrl=cleanRoomCode(new URL(location.href).searchParams.get("room"));
   if(roomFromUrl) $("roomInput").value=roomFromUrl;
+  $("nameInput").value=localStorage.getItem("nc_name")||"";
+
+  onValue(ref(db,".info/serverTimeOffset"),snap=>{
+    serverTimeOffset=Number(snap.val())||0;
+  });
+  onValue(ref(db,".info/connected"),snap=>{
+    dbConnected=snap.val()===true;
+    if(!dbConnected){
+      presenceConnectionId=null;
+      presenceDisconnect=null;
+      presenceStarting=false;
+    }else if(currentRoom){
+      startPresence();
+    }
+  });
 
   onAuthStateChanged(auth,async user=>{
     if(user){
       uid=user.uid;
       hide($("bootPanel"));
       show($("homePanel"));
-
-      const savedRoom=localStorage.getItem("nc_room");
-      const savedSlot=localStorage.getItem("nc_slot");
-      if(savedRoom&&(savedSlot==="A"||savedSlot==="B")){
-        try{
-          const mine=await get(ref(db,`rooms/${savedRoom}/players/${savedSlot}/uid`));
-          if(mine.exists()&&mine.val()===uid){
-            enterRoom(savedRoom,savedSlot);
-          }else clearSession();
-        }catch{clearSession();}
-      }
+      await offerSavedSession();
     }
   });
 
