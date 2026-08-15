@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>No Chinese! Multiplayer Test</title>
+  <style>
+    :root{
+      --bg:#f6f3ed;--panel:#fffdf8;--text:#222;--muted:#706b63;--line:#ddd6ca;
+      --soft:#eee9df;--good:#e9f7ed;--bad:#fff0ed;--accent:#222;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    .wrap{max-width:720px;margin:auto;padding:24px 16px 48px}
+    h1{margin:6px 0 2px;text-align:center;font-size:38px}
+    .sub{text-align:center;color:var(--muted);margin-bottom:18px;line-height:1.55}
+    .panel{
+      background:var(--panel);border:1px solid var(--line);border-radius:22px;
+      padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.06);margin-bottom:14px;
+    }
+    .hidden{display:none!important}
+    label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px}
+    input{
+      width:100%;padding:14px;border:1px solid var(--line);border-radius:14px;
+      font:inherit;background:white;
+    }
+    button{
+      border:0;border-radius:14px;padding:13px 16px;font:inherit;font-weight:800;
+      cursor:pointer;touch-action:manipulation;
+    }
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .primary{background:#222;color:white}
+    .secondary{background:var(--soft);color:#222}
+    .danger{background:#f4dfda;color:#5f251b}
+    .row{display:flex;gap:10px;margin-top:12px}
+    .row>*{flex:1}
+    .status{
+      padding:12px 14px;border-radius:14px;background:var(--soft);font-size:14px;
+      line-height:1.55;margin-bottom:12px;
+    }
+    .status.good{background:var(--good)}
+    .status.bad{background:var(--bad)}
+    .roomCode{font-size:34px;font-weight:900;letter-spacing:.12em;text-align:center;margin:10px 0}
+    .players{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .player{
+      border:1px solid var(--line);border-radius:16px;padding:14px;background:white;min-height:130px;
+    }
+    .slot{font-size:12px;color:var(--muted);font-weight:800}
+    .name{font-size:20px;font-weight:900;margin:7px 0}
+    .tickets{font-size:28px;font-weight:900}
+    .me{outline:2px solid #222}
+    .small{font-size:12px;color:var(--muted);line-height:1.55}
+    .startBox{
+      margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:16px;
+      background:#faf8f3;text-align:center;
+    }
+    @media(max-width:520px){.players{grid-template-columns:1fr}.row{flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>No Chinese! 🎴</h1>
+  <div class="sub">v0.3.1 联机测试 · 房间大厅 + 双人实时同步</div>
+
+  <div id="bootPanel" class="panel">
+    <div id="bootStatus" class="status">正在连接 Firebase，并创建匿名身份…</div>
+  </div>
+
+  <div id="homePanel" class="panel hidden">
+    <div class="status good">✅ Firebase 已连接。你不需要注册账号。</div>
+
+    <label>你的显示名字</label>
+    <input id="nameInput" maxlength="24" placeholder="例如 Lii" />
+
+    <div class="row">
+      <button id="createBtn" class="primary">创建房间</button>
+    </div>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+
+    <label>加入已有房间</label>
+    <input id="roomInput" maxlength="6" placeholder="输入 6 位房间码" autocomplete="off" />
+    <button id="joinBtn" class="secondary" style="width:100%;margin-top:10px">加入房间</button>
+  </div>
+
+  <div id="roomPanel" class="panel hidden">
+    <div id="roomStatus" class="status">正在进入房间…</div>
+    <div class="small" style="text-align:center">房间码</div>
+    <div id="roomCode" class="roomCode">------</div>
+
+    <div class="row">
+      <button id="copyCodeBtn" class="secondary">复制房间码</button>
+      <button id="copyBtn" class="secondary">复制邀请链接</button>
+    </div>
+    <div class="row">
+      <button id="leaveBtn" class="secondary">回到首页</button>
+    </div>
+
+    <div style="height:14px"></div>
+    <div class="players">
+      <div id="playerA" class="player">
+        <div class="slot">PLAYER A</div>
+        <div id="nameA" class="name">等待中…</div>
+        <div id="ticketsA" class="tickets">🎫 —</div>
+        <button id="useTicketA" class="danger hidden" style="width:100%;margin-top:10px">使用我的 1 张券</button>
+      </div>
+      <div id="playerB" class="player">
+        <div class="slot">PLAYER B</div>
+        <div id="nameB" class="name">等待加入…</div>
+        <div id="ticketsB" class="tickets">🎫 —</div>
+        <button id="useTicketB" class="danger hidden" style="width:100%;margin-top:10px">使用我的 1 张券</button>
+      </div>
+    </div>
+
+    <div id="startBox" class="startBox">
+      <div id="startText" class="small">等待另一位玩家加入后开始。</div>
+      <button id="startBtn" class="primary hidden" style="width:100%;margin-top:10px">开始游戏</button>
+    </div>
+
+    <div class="small" style="margin-top:14px">
+      大厅阶段不允许使用中文券。A 与 B 都进入后，由 Player A 开始游戏；进入 playing 状态以后才能扣券。
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+  import { getDatabase, ref, set, get, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBIbMEYAevOUtxBsUW_1v0b-Z9TMwfUQQ0",
+    authDomain: "no-chinese-game.firebaseapp.com",
+    projectId: "no-chinese-game",
+    storageBucket: "no-chinese-game.firebasestorage.app",
+    messagingSenderId: "610555847309",
+    appId: "1:610555847309:web:b92ae63c8a9e259ea338c4",
+    databaseURL: "https://no-chinese-game-default-rtdb.asia-southeast1.firebasedatabase.app"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+
+  const $ = id => document.getElementById(id);
+  let uid = null;
+  let currentRoom = null;
+  let mySlot = null;
+  let roomPlayers = {};
+  let gameStatus = "lobby";
+  let unsubPlayers = null;
+  let unsubStatus = null;
+
+  const show = el => el.classList.remove("hidden");
+  const hide = el => el.classList.add("hidden");
+
+  function setStatus(el,text,kind=""){
+    el.textContent=text;
+    el.className="status"+(kind?" "+kind:"");
+  }
+
+  function cleanName(){
+    const n=$("nameInput").value.trim();
+    if(!n) throw new Error("请先输入你的名字。");
+    return n.slice(0,24);
+  }
+
+  function cleanRoomCode(raw){
+    return raw.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
+  }
+
+  function makeRoomCode(){
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let out="";
+    for(let i=0;i<6;i++) out+=chars[Math.floor(Math.random()*chars.length)];
+    return out;
+  }
+
+  async function roomAppearsUnused(code){
+    const snap=await get(ref(db,`rooms/${code}/meta/open`));
+    return !snap.exists();
+  }
+
+  function saveSession(code,slot){
+    localStorage.setItem("nc_room",code);
+    localStorage.setItem("nc_slot",slot);
+  }
+
+  function clearSession(){
+    localStorage.removeItem("nc_room");
+    localStorage.removeItem("nc_slot");
+  }
+
+  async function createRoom(){
+    const name=cleanName();
+    $("createBtn").disabled=true;
+    try{
+      let code;
+      for(let i=0;i<8;i++){
+        const c=makeRoomCode();
+        if(await roomAppearsUnused(c)){code=c;break;}
+      }
+      if(!code) throw new Error("没能生成空房间，请再试一次。");
+
+      await set(ref(db,`rooms/${code}/players/A/uid`),uid);
+      await set(ref(db,`rooms/${code}/players/A/name`),name);
+      await set(ref(db,`rooms/${code}/players/A/tickets`),5);
+      await set(ref(db,`rooms/${code}/meta/open`),true);
+      await set(ref(db,`rooms/${code}/state/status`),"lobby");
+      await set(ref(db,`rooms/${code}/state/turn`),"A");
+
+      enterRoom(code,"A");
+    }catch(err){
+      alert("创建房间失败：\n"+(err.message||err));
+      console.error(err);
+    }finally{
+      $("createBtn").disabled=false;
+    }
+  }
+
+  async function joinRoom(){
+    const name=cleanName();
+    const code=cleanRoomCode($("roomInput").value);
+    if(code.length!==6) return alert("请输入完整的 6 位房间码。");
+
+    $("joinBtn").disabled=true;
+    try{
+      const openSnap=await get(ref(db,`rooms/${code}/meta/open`));
+      if(!openSnap.exists()||openSnap.val()!==true) throw new Error("没有找到这个开放房间。");
+
+      await set(ref(db,`rooms/${code}/players/B/uid`),uid);
+      await set(ref(db,`rooms/${code}/players/B/name`),name);
+      await set(ref(db,`rooms/${code}/players/B/tickets`),5);
+
+      enterRoom(code,"B");
+    }catch(err){
+      const msg=String(err.message||err);
+      if(msg.toLowerCase().includes("permission")){
+        alert("加入失败：这个房间可能已经有两个人了，或权限规则拒绝了加入。");
+      }else{
+        alert("加入房间失败：\n"+msg);
+      }
+      console.error(err);
+    }finally{
+      $("joinBtn").disabled=false;
+    }
+  }
+
+  function refreshLobbyUI(){
+    const both=!!(roomPlayers.A?.uid && roomPlayers.B?.uid);
+    const playing=gameStatus==="playing";
+
+    $("useTicketA").classList.toggle("hidden", !(playing && mySlot==="A"));
+    $("useTicketB").classList.toggle("hidden", !(playing && mySlot==="B"));
+
+    if(playing){
+      $("startText").textContent="🎮 游戏已开始。现在可以使用自己的中文券。";
+      hide($("startBtn"));
+      setStatus($("roomStatus"),"✅ 游戏进行中。双方状态实时同步。","good");
+    }else if(both){
+      if(mySlot==="A"){
+        $("startText").textContent="两位玩家都到了。由你开始游戏。";
+        show($("startBtn"));
+      }else{
+        $("startText").textContent="两位玩家都到了，等待 Player A 开始游戏…";
+        hide($("startBtn"));
+      }
+      setStatus($("roomStatus"),"✅ 两位玩家都已连接。","good");
+    }else{
+      $("startText").textContent=mySlot==="A"?"等待 Player B 加入后开始。":"等待房间准备完成…";
+      hide($("startBtn"));
+      setStatus($("roomStatus"),mySlot==="A"?"房间已创建，等待 Player B 加入…":"已加入房间，正在同步…","good");
+    }
+
+    const mine=mySlot==="A"?roomPlayers.A:roomPlayers.B;
+    const btn=mySlot==="A"?$("useTicketA"):$("useTicketB");
+    if(btn) btn.disabled=!(playing && mine && typeof mine.tickets==="number" && mine.tickets>0);
+  }
+
+  function enterRoom(code,slot){
+    currentRoom=code;
+    mySlot=slot;
+    saveSession(code,slot);
+
+    hide($("homePanel"));
+    hide($("bootPanel"));
+    show($("roomPanel"));
+    $("roomCode").textContent=code;
+
+    $("playerA").classList.toggle("me",slot==="A");
+    $("playerB").classList.toggle("me",slot==="B");
+
+    if(unsubPlayers) unsubPlayers();
+    if(unsubStatus) unsubStatus();
+
+    unsubPlayers=onValue(ref(db,`rooms/${code}/players`),snap=>{
+      roomPlayers=snap.val()||{};
+      $("nameA").textContent=roomPlayers.A?.name||"等待中…";
+      $("nameB").textContent=roomPlayers.B?.name||"等待加入…";
+      $("ticketsA").textContent=`🎫 ${roomPlayers.A?.tickets ?? "—"}`;
+      $("ticketsB").textContent=`🎫 ${roomPlayers.B?.tickets ?? "—"}`;
+      refreshLobbyUI();
+    },err=>{
+      setStatus($("roomStatus"),"读取房间失败："+err.message,"bad");
+      console.error(err);
+    });
+
+    unsubStatus=onValue(ref(db,`rooms/${code}/state/status`),snap=>{
+      gameStatus=snap.val()||"lobby";
+      refreshLobbyUI();
+    },err=>{
+      setStatus($("roomStatus"),"读取游戏状态失败："+err.message,"bad");
+      console.error(err);
+    });
+  }
+
+  async function startGame(){
+    if(mySlot!=="A"||!currentRoom) return;
+    $("startBtn").disabled=true;
+    try{
+      if(!(roomPlayers.A?.uid&&roomPlayers.B?.uid)) throw new Error("Player B 还没有加入。");
+      await set(ref(db,`rooms/${currentRoom}/meta/open`),false);
+      await set(ref(db,`rooms/${currentRoom}/state/status`),"playing");
+    }catch(err){
+      alert("开始游戏失败："+(err.message||err));
+      console.error(err);
+      $("startBtn").disabled=false;
+    }
+  }
+
+  async function useMyTicket(slot){
+    if(slot!==mySlot||!currentRoom||gameStatus!=="playing") return;
+    const ticketRef=ref(db,`rooms/${currentRoom}/players/${slot}/tickets`);
+    try{
+      await runTransaction(ticketRef,current=>{
+        if(typeof current!=="number"||current<=0) return;
+        return current-1;
+      },{applyLocally:false});
+    }catch(err){
+      alert("使用券失败："+(err.message||err));
+      console.error(err);
+    }
+  }
+
+  async function copyText(text,button,label){
+    try{
+      await navigator.clipboard.writeText(text);
+      button.textContent="已复制 ✓";
+      setTimeout(()=>button.textContent=label,1400);
+    }catch{
+      prompt("复制：",text);
+    }
+  }
+
+  $("createBtn").addEventListener("click",createRoom);
+  $("joinBtn").addEventListener("click",joinRoom);
+  $("startBtn").addEventListener("click",startGame);
+  $("useTicketA").addEventListener("click",()=>useMyTicket("A"));
+  $("useTicketB").addEventListener("click",()=>useMyTicket("B"));
+
+  $("roomInput").addEventListener("input",e=>e.target.value=cleanRoomCode(e.target.value));
+
+  $("copyCodeBtn").addEventListener("click",()=>{
+    if(currentRoom) copyText(currentRoom,$("copyCodeBtn"),"复制房间码");
+  });
+
+  $("copyBtn").addEventListener("click",()=>{
+    if(!currentRoom) return;
+    const u=new URL(location.href);
+    u.searchParams.set("room",currentRoom);
+    copyText(u.toString(),$("copyBtn"),"复制邀请链接");
+  });
+
+  $("leaveBtn").addEventListener("click",()=>{
+    if(unsubPlayers) unsubPlayers();
+    if(unsubStatus) unsubStatus();
+    unsubPlayers=null;unsubStatus=null;
+    currentRoom=null;mySlot=null;roomPlayers={};gameStatus="lobby";
+    clearSession();
+    hide($("roomPanel"));
+    show($("homePanel"));
+  });
+
+  const roomFromUrl=cleanRoomCode(new URL(location.href).searchParams.get("room")||"");
+  if(roomFromUrl) $("roomInput").value=roomFromUrl;
+
+  onAuthStateChanged(auth,async user=>{
+    if(user){
+      uid=user.uid;
+      hide($("bootPanel"));
+      show($("homePanel"));
+
+      const savedRoom=localStorage.getItem("nc_room");
+      const savedSlot=localStorage.getItem("nc_slot");
+      if(savedRoom&&(savedSlot==="A"||savedSlot==="B")){
+        try{
+          const mine=await get(ref(db,`rooms/${savedRoom}/players/${savedSlot}/uid`));
+          if(mine.exists()&&mine.val()===uid){
+            enterRoom(savedRoom,savedSlot);
+          }else clearSession();
+        }catch{clearSession();}
+      }
+    }
+  });
+
+  signInAnonymously(auth).catch(err=>{
+    setStatus($("bootStatus"),"匿名登录失败："+err.message,"bad");
+    console.error(err);
+  });
+</script>
+</body>
+</html>
