@@ -32,6 +32,10 @@
       cursor:pointer;touch-action:manipulation;
     }
     button:disabled{opacity:.45;cursor:not-allowed}
+    .buttonLink{
+      display:block;border-radius:14px;padding:13px 16px;font:inherit;font-weight:800;
+      text-align:center;text-decoration:none;background:var(--soft);color:var(--text);
+    }
     .primary{background:#222;color:white}
     .secondary{background:var(--soft);color:#222}
     .danger{background:#f4dfda;color:#5f251b}
@@ -95,7 +99,7 @@
 <body>
 <div class="wrap">
   <h1>不讲中文交流会 🎴</h1>
-  <div class="sub">v0.4.2 · 双人实时抽卡游戏</div>
+  <div class="sub">v0.5.0 · 双人实时抽卡游戏</div>
 
   <div id="bootPanel" class="panel">
     <div id="bootStatus" class="status">正在连接 Firebase，并创建匿名身份…</div>
@@ -103,6 +107,8 @@
 
   <div id="homePanel" class="panel hidden">
     <div class="status good">✅ Firebase 已连接。你不需要注册账号。</div>
+
+    <a class="buttonLink" href="schedule.html">🗓️ 先和朋友约一个时间</a>
 
     <div id="recoveryBox" class="recovery hidden">
       <div id="recoveryText"><strong>检测到上次房间</strong></div>
