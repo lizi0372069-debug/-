@@ -44,13 +44,13 @@
     .status.good{background:var(--good)}
     .status.bad{background:var(--bad)}
     .roomCode{font-size:34px;font-weight:900;letter-spacing:.12em;text-align:center;margin:10px 0}
-    .players{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .players{display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .player{
-      border:1px solid var(--line);border-radius:16px;padding:14px;background:white;min-height:150px;
+      border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:white;min-height:0;
     }
-    .slot{font-size:12px;color:var(--muted);font-weight:800}
-    .name{font-size:20px;font-weight:900;margin:7px 0}
-    .presence{font-size:13px;font-weight:800;margin:0 0 7px;color:var(--muted)}
+    .slot{font-size:10px;color:var(--muted);font-weight:800;letter-spacing:.04em}
+    .name{font-size:17px;font-weight:900;margin:3px 0}
+    .presence{font-size:12px;font-weight:800;margin:0;color:var(--muted)}
     .presence.online{color:#277742}
     .tickets{font-size:28px;font-weight:900}
     .me{outline:2px solid #222}
@@ -61,7 +61,7 @@
     }
     .recovery{border:1px solid var(--line);border-radius:16px;padding:14px;background:#faf8f3;margin:14px 0}
     .gamePanel{margin-top:16px;border:2px solid #222;border-radius:20px;padding:16px;background:#fff}
-    .turnBanner{text-align:center;font-size:22px;font-weight:900;margin-bottom:12px}
+    .turnBanner{text-align:center;font-size:22px;font-weight:900;margin-bottom:10px}
     .rescueBanner{
       padding:13px;border-radius:14px;background:#fff3c9;color:#6b4b00;text-align:center;
       font-weight:900;font-size:18px;margin-bottom:12px;
@@ -69,8 +69,9 @@
     .cardStage{border:1px solid var(--line);border-radius:18px;padding:18px;background:#faf8f3;text-align:center;min-height:210px}
     .cardType{font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
     .cardText{font-size:28px;font-weight:900;line-height:1.45;margin:18px 0}
-    .deckButtons{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px}
-    .deckTab{border:2px solid transparent}
+    #deckPicker{margin:4px 0 14px}
+    .deckButtons{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:0}
+    .deckTab{border:2px solid transparent;padding:10px 8px;font-size:15px}
     .deckTab.active{border-color:#222;box-shadow:inset 0 0 0 1px #222}
     .deckDaily{background:#e6f5e9;color:#235d31}
     .deckTalk{background:#fff0dd;color:#7a4611}
@@ -81,13 +82,20 @@
     .ticketShelf{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
     .ticketCard{border:1px solid var(--line);border-radius:16px;padding:14px;background:#faf8f3}
     .ticketValue{font-size:30px;font-weight:900;margin:6px 0}
-    @media(max-width:520px){.players{grid-template-columns:1fr}.row{flex-direction:column}}
+    @media(max-width:520px){
+      .players{grid-template-columns:1fr 1fr;gap:7px}
+      .player{padding:9px}
+      .name{font-size:16px}
+      .presence{font-size:11px}
+      .deckTab{font-size:13px;padding:9px 4px}
+      .row{flex-direction:column}
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>不讲中文交流会 🎴</h1>
-  <div class="sub">v0.4.1 · 双人实时抽卡游戏</div>
+  <div class="sub">v0.4.2 · 双人实时抽卡游戏</div>
 
   <div id="bootPanel" class="panel">
     <div id="bootStatus" class="status">正在连接 Firebase，并创建匿名身份…</div>
